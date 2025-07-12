@@ -18,7 +18,8 @@ const corsOption = {
       'https://*.ngrok-free.app',  // Allow ngrok domains for beta users
       'exp://192.168.18.112:8081',  // Expo app (device/emulator)
       'exp://localhost:8081',       // Expo app (local)
-      'https://b4ai.netlify.app'
+      'https://b4ai.netlify.app',
+      'http://localhost:3001', // Local development
     ];
 
     // Check if the origin is in the allowed list
