@@ -5,6 +5,7 @@ import { addCategory, addQuestion, getQuestion } from "../controllers/quiz-contr
 import { authenticateToken } from "../middleware/authMiddleware.js";
 import { Quiz } from "../models/quizModel.js"; // ✅ Correct import
 import { userModel } from "../models/userModel.js";
+import { StudentQuiz } from "../models/studentQuizModel.js";
 
 const router = express.Router();
 
@@ -384,6 +385,442 @@ router.get("/manage-quizzes/:quizId", authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to get quiz details",
+      error: error.message
+    });
+  }
+});
+
+// ✅ STUDENT QUIZ SUBMISSION ROUTES
+
+// GET ALL STUDENT SUBMISSIONS (Admin View)
+router.get("/student-submissions", authenticateToken, async (req, res) => {
+  try {
+    const { status, category, language, page = 1, limit = 20 } = req.query;
+    
+    console.log("📋 Fetching student quiz submissions...");
+    console.log("🔍 Filters:", { status, category, language });
+    
+    // Build filter query
+    const filter = {};
+    if (status && status !== 'all') filter.status = status;
+    if (category && category !== 'all') filter.category = category;
+    if (language && language !== 'all') filter.language = language;
+    
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Fetch submissions with pagination
+    const submissions = await StudentQuiz.find(filter)
+      .populate('userId', 'email profile.firstName profile.lastName role')
+      .populate('moderatedBy', 'email profile.firstName profile.lastName')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+    
+    // Get total count for pagination
+    const totalCount = await StudentQuiz.countDocuments(filter);
+    
+    console.log(`📊 Found ${submissions.length} submissions (${totalCount} total)`);
+    
+    // Transform data
+    const transformedSubmissions = submissions.map(submission => ({
+      _id: submission._id,
+      question: submission.question,
+      options: submission.options,
+      correctAnswer: submission.correctAnswer,
+      category: submission.category,
+      subCategory: submission.subCategory,
+      language: submission.language,
+      difficulty: submission.difficulty,
+      status: submission.status,
+      moderationNotes: submission.moderationNotes,
+      submissionSource: submission.submissionSource,
+      qualityScore: submission.qualityScore,
+      reportCount: submission.reportCount,
+      viewCount: submission.viewCount,
+      tags: submission.tags,
+      createdAt: submission.createdAt,
+      updatedAt: submission.updatedAt,
+      moderatedAt: submission.moderatedAt,
+      submitter: submission.userId ? {
+        _id: submission.userId._id,
+        email: submission.userId.email,
+        name: `${submission.userId.profile?.firstName || ''} ${submission.userId.profile?.lastName || ''}`.trim() || submission.userId.email.split('@')[0],
+        role: submission.userId.role
+      } : null,
+      moderator: submission.moderatedBy ? {
+        _id: submission.moderatedBy._id,
+        email: submission.moderatedBy.email,
+        name: `${submission.moderatedBy.profile?.firstName || ''} ${submission.moderatedBy.profile?.lastName || ''}`.trim() || submission.moderatedBy.email.split('@')[0]
+      } : null
+    }));
+    
+    res.json({
+      success: true,
+      message: "Student submissions fetched successfully",
+      submissions: transformedSubmissions,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalCount / parseInt(limit)),
+        totalItems: totalCount,
+        itemsPerPage: parseInt(limit)
+      }
+    });
+    
+  } catch (error) {
+    console.error("❌ Fetch student submissions error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch student submissions",
+      error: error.message
+    });
+  }
+});
+
+// BULK APPROVE STUDENT SUBMISSIONS
+router.put("/student-submissions/bulk-approve", authenticateToken, async (req, res) => {
+  try {
+    const { submissionIds, notes = '' } = req.body;
+    
+    console.log("✅ BULK APPROVE REQUEST");
+    console.log("📝 Submission IDs:", submissionIds);
+    console.log("🔍 Moderator:", req.user?.userId);
+    
+    if (!submissionIds || !Array.isArray(submissionIds) || submissionIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Submission IDs are required"
+      });
+    }
+    
+    // Perform bulk approval
+    const result = await StudentQuiz.bulkUpdateStatus(
+      submissionIds, 
+      'approved', 
+      req.user.userId, 
+      notes
+    );
+    
+    console.log("✅ Bulk approval completed:", result);
+    
+    res.json({
+      success: true,
+      message: `${result.modifiedCount} submissions approved successfully`,
+      modifiedCount: result.modifiedCount
+    });
+    
+  } catch (error) {
+    console.error("❌ Bulk approve error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to approve submissions",
+      error: error.message
+    });
+  }
+});
+
+// BULK REJECT STUDENT SUBMISSIONS
+router.put("/student-submissions/bulk-reject", authenticateToken, async (req, res) => {
+  try {
+    const { submissionIds, notes = '' } = req.body;
+    
+    console.log("❌ BULK REJECT REQUEST");
+    console.log("📝 Submission IDs:", submissionIds);
+    console.log("🔍 Moderator:", req.user?.userId);
+    
+    if (!submissionIds || !Array.isArray(submissionIds) || submissionIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Submission IDs are required"
+      });
+    }
+    
+    // Perform bulk rejection
+    const result = await StudentQuiz.bulkUpdateStatus(
+      submissionIds, 
+      'rejected', 
+      req.user.userId, 
+      notes
+    );
+    
+    console.log("❌ Bulk rejection completed:", result);
+    
+    res.json({
+      success: true,
+      message: `${result.modifiedCount} submissions rejected successfully`,
+      modifiedCount: result.modifiedCount
+    });
+    
+  } catch (error) {
+    console.error("❌ Bulk reject error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reject submissions",
+      error: error.message
+    });
+  }
+});
+
+// BULK DELETE STUDENT SUBMISSIONS
+router.delete("/student-submissions/bulk-delete", authenticateToken, async (req, res) => {
+  try {
+    const { submissionIds } = req.body;
+    
+    console.log("🗑️ BULK DELETE REQUEST");
+    console.log("📝 Submission IDs:", submissionIds);
+    console.log("🔍 Requested by:", req.user?.userId);
+    
+    if (!submissionIds || !Array.isArray(submissionIds) || submissionIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Submission IDs are required"
+      });
+    }
+    
+    // Perform bulk deletion
+    const result = await StudentQuiz.bulkDelete(submissionIds);
+    
+    console.log("🗑️ Bulk deletion completed:", result);
+    
+    res.json({
+      success: true,
+      message: `${result.deletedCount} submissions deleted successfully`,
+      deletedCount: result.deletedCount
+    });
+    
+  } catch (error) {
+    console.error("❌ Bulk delete error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete submissions",
+      error: error.message
+    });
+  }
+});
+
+// GET MODERATION STATISTICS
+router.get("/student-submissions/stats", authenticateToken, async (req, res) => {
+  try {
+    console.log("📊 Fetching moderation statistics...");
+    
+    // Get status distribution
+    const statusStats = await StudentQuiz.getModerationStats();
+    
+    // Get category/language distribution
+    const categoryStats = await StudentQuiz.aggregate([
+      {
+        $group: {
+          _id: {
+            category: "$category",
+            language: "$language"
+          },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    // Get recent activity
+    const recentActivity = await StudentQuiz.find()
+      .populate('moderatedBy', 'profile.firstName profile.lastName email')
+      .sort({ moderatedAt: -1 })
+      .limit(10)
+      .select('question status moderatedBy moderatedAt moderationNotes');
+    
+    // Get submissions by submitter
+    const submitterStats = await StudentQuiz.aggregate([
+      {
+        $group: {
+          _id: "$userId",
+          totalSubmissions: { $sum: 1 },
+          approvedSubmissions: { 
+            $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] } 
+          },
+          rejectedSubmissions: { 
+            $sum: { $cond: [{ $eq: ["$status", "rejected"] }, 1, 0] } 
+          }
+        }
+      },
+      { $sort: { totalSubmissions: -1 } },
+      { $limit: 10 }
+    ]);
+    
+    res.json({
+      success: true,
+      message: "Moderation statistics fetched successfully",
+      stats: {
+        statusDistribution: statusStats,
+        categoryDistribution: categoryStats,
+        recentActivity: recentActivity,
+        topSubmitters: submitterStats
+      }
+    });
+    
+  } catch (error) {
+    console.error("❌ Fetch stats error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch statistics",
+      error: error.message
+    });
+  }
+});
+
+// SUBMIT NEW QUIZ (For Android App)
+router.post("/student-submissions", authenticateToken, async (req, res) => {
+  try {
+    const { 
+      question, 
+      options, 
+      correctAnswer, 
+      category, 
+      subCategory, 
+      language = 'english',
+      difficulty = 'medium',
+      deviceInfo,
+      submissionIP 
+    } = req.body;
+    
+    console.log("📝 NEW STUDENT SUBMISSION");
+    console.log("👤 Submitted by:", req.user?.userId);
+    
+    // Validation
+    if (!question || !question.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Question is required"
+      });
+    }
+    
+    if (!options || !Array.isArray(options) || options.length !== 4) {
+      return res.status(400).json({
+        success: false,
+        message: "Exactly 4 options are required"
+      });
+    }
+    
+    if (options.some(option => !option || !option.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: "All options must have content"
+      });
+    }
+    
+    const correctIndex = parseInt(correctAnswer);
+    if (isNaN(correctIndex) || correctIndex < 0 || correctIndex > 3) {
+      return res.status(400).json({
+        success: false,
+        message: "Correct answer must be between 0 and 3"
+      });
+    }
+    
+    // Create submission
+    const submissionData = {
+      userId: req.user.userId,
+      question: question.trim(),
+      options: options.map(option => option.trim()),
+      correctAnswer: correctIndex,
+      category: category?.trim() || null,
+      subCategory: subCategory?.trim() || null,
+      language: language,
+      difficulty: difficulty,
+      status: 'pending',
+      submissionSource: 'android_app',
+      deviceInfo: deviceInfo || null,
+      submissionIP: submissionIP || req.ip
+    };
+    
+    const newSubmission = new StudentQuiz(submissionData);
+    const savedSubmission = await newSubmission.save();
+    
+    console.log("✅ Student submission saved:", savedSubmission._id);
+    
+    res.status(201).json({
+      success: true,
+      message: "Quiz submitted successfully for review",
+      submissionId: savedSubmission._id
+    });
+    
+  } catch (error) {
+    console.error("❌ Student submission error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to submit quiz",
+      error: error.message
+    });
+  }
+});
+
+// ✅ UPDATE EXISTING QUIZ ROUTES FOR BULK OPERATIONS
+
+// BULK UPDATE CATEGORIES FOR ADMIN QUIZZES
+router.put("/manage-quizzes/bulk-category", authenticateToken, async (req, res) => {
+  try {
+    const { quizIds, category, subCategory } = req.body;
+    
+    console.log("📂 BULK CATEGORY UPDATE REQUEST");
+    console.log("📝 Quiz IDs:", quizIds);
+    console.log("🔍 New Category:", { category, subCategory });
+    
+    if (!quizIds || !Array.isArray(quizIds) || quizIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Quiz IDs are required"
+      });
+    }
+    
+    // Perform bulk category update
+    const result = await Quiz.bulkUpdateCategory(quizIds, category, subCategory);
+    
+    console.log("📂 Bulk category update completed:", result);
+    
+    res.json({
+      success: true,
+      message: `${result.modifiedCount} quizzes updated successfully`,
+      modifiedCount: result.modifiedCount
+    });
+    
+  } catch (error) {
+    console.error("❌ Bulk category update error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update quiz categories",
+      error: error.message
+    });
+  }
+});
+
+// BULK DELETE ADMIN QUIZZES
+router.delete("/manage-quizzes/bulk-delete", authenticateToken, async (req, res) => {
+  try {
+    const { quizIds } = req.body;
+    
+    console.log("🗑️ BULK DELETE ADMIN QUIZZES REQUEST");
+    console.log("📝 Quiz IDs:", quizIds);
+    console.log("🔍 Requested by:", req.user?.userId);
+    
+    if (!quizIds || !Array.isArray(quizIds) || quizIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Quiz IDs are required"
+      });
+    }
+    
+    // Perform bulk deletion
+    const result = await Quiz.bulkDelete(quizIds);
+    
+    console.log("🗑️ Bulk deletion completed:", result);
+    
+    res.json({
+      success: true,
+      message: `${result.deletedCount} quizzes deleted successfully`,
+      deletedCount: result.deletedCount
+    });
+    
+  } catch (error) {
+    console.error("❌ Bulk delete error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete quizzes",
       error: error.message
     });
   }
