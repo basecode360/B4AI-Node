@@ -4,6 +4,7 @@ import cors from "cors";
 import connectDB from "./utils/db.js";
 import authRoutes from "./routes/user.route.js";
 import quizRoute from "./routes/quiz.route.js";
+import analyticsRoute from "./routes/analytics.route.js";
 import cookieParser from "cookie-parser";
 
 // Load environment variables
@@ -19,7 +20,7 @@ const corsOption = {
       'exp://192.168.18.112:8081',  // Expo app (device/emulator)
       'exp://localhost:8081',       // Expo app (local)
       'https://b4ai.netlify.app',
-      'http://localhost:3001', // Local development
+      'http://localhost:3000', // Local development
     ];
 
     // Check if the origin is in the allowed list
@@ -74,6 +75,7 @@ app.get("/health", (req, res) => {
 // api routes
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/quiz", quizRoute);
+app.use("/api/v1/analytics", analyticsRoute);
 
 // Start server
 app.listen(PORT, HOST, () => {
