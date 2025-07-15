@@ -9,12 +9,211 @@ import { StudentQuiz } from "../models/studentQuizModel.js";
 
 const router = express.Router();
 
-// Existing routes
+// ✅ UPDATED: Existing routes (keeping your original controller functions)
 router.post("/add-question", addQuestion);
 router.put("/add-category/:questionId", addCategory);
 router.get("/get-question", authenticateToken, getQuestion);
 
-// ✅ GET ALL QUIZZES - Admin Management
+// ✅ NEW: Frontend App Routes (for studentquizzes collection)
+// POST: Add question to studentquizzes collection (for frontend app)
+router.post("/frontend/add-question", authenticateToken, async (req, res) => {
+  try {
+    const { 
+      question, 
+      answers, 
+      correctAnswerIndex, 
+      category, 
+      subCategory,
+      language = "english",
+      difficulty = "medium",
+      tags = []
+    } = req.body;
+
+    console.log("\n=== FRONTEND APP - ADD QUESTION REQUEST ===");
+    console.log("Request Body:", req.body);
+    console.log("User ID:", req.user?.userId);
+
+    // Validation
+    if (!question || !question.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Question is required",
+      });
+    }
+
+    if (!answers || !Array.isArray(answers) || answers.length < 3) {
+      return res.status(400).json({
+        success: false,
+        message: "At least 3 answer options are required",
+      });
+    }
+
+    if (correctAnswerIndex === null || correctAnswerIndex === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Correct answer index is required",
+      });
+    }
+
+    if (correctAnswerIndex < 0 || correctAnswerIndex > 3) {
+      return res.status(400).json({
+        success: false,
+        message: "Correct answer index must be between 0 and 3",
+      });
+    }
+
+    // Validate language
+    const validLanguages = ["english", "french", "spanish", "german"];
+    if (!validLanguages.includes(language)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid language. Must be: english, french, spanish, or german",
+      });
+    }
+
+    // Validate difficulty
+    const validDifficulties = ["easy", "medium", "hard"];
+    if (!validDifficulties.includes(difficulty)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid difficulty. Must be: easy, medium, or hard",
+      });
+    }
+
+    console.log("✅ Validation passed");
+
+    // Create document for studentquizzes collection (Updated Schema)
+    const questionDocument = {
+      userId: req.user.userId, // From authentication middleware
+      question: question.trim(),
+      options: answers.map(ans => ans.trim()).slice(0, 4), // Max 4 options
+      correctAnswer: correctAnswerIndex,
+      category: category || null,
+      subCategory: subCategory || null,
+      language: language,
+      difficulty: difficulty,
+      status: "active",
+      tags: Array.isArray(tags) ? tags : [],
+      usageCount: 0,
+      successRate: null
+    };
+
+    console.log("\n=== DOCUMENT TO BE SAVED (FRONTEND APP) ===");
+    console.log(JSON.stringify(questionDocument, null, 2));
+
+    // Save to studentquizzes collection
+    const newQuestion = new Quiz(questionDocument);
+    const savedQuestion = await newQuestion.save();
+
+    console.log("\n✅ SUCCESSFULLY SAVED TO STUDENTQUIZZES COLLECTION");
+    console.log("Document ID:", savedQuestion._id);
+
+    // Success response
+    res.status(201).json({
+      success: true,
+      message: "Question added to studentquizzes collection successfully",
+      data: {
+        _id: savedQuestion._id,
+        questionId: savedQuestion._id,
+        question: savedQuestion.question,
+        options: savedQuestion.options,
+        correctAnswerIndex: savedQuestion.correctAnswer,
+        correctAnswerText: savedQuestion.options[savedQuestion.correctAnswer],
+        category: savedQuestion.category,
+        subCategory: savedQuestion.subCategory,
+        language: savedQuestion.language,
+        difficulty: savedQuestion.difficulty,
+        status: savedQuestion.status,
+        tags: savedQuestion.tags,
+        totalOptions: savedQuestion.options.length,
+        collection: "studentquizzes",
+        createdAt: savedQuestion.createdAt,
+        updatedAt: savedQuestion.updatedAt
+      },
+    });
+
+  } catch (error) {
+    console.error("\n❌ FRONTEND APP - ERROR SAVING TO DATABASE:");
+    console.error("Error message:", error.message);
+    
+    res.status(500).json({
+      success: false,
+      message: "Failed to save to studentquizzes collection",
+      error: error.message,
+    });
+  }
+});
+
+// ✅ NEW: Get questions for frontend app with filters
+router.get("/frontend/questions", authenticateToken, async (req, res) => {
+  const userId = req.user?.userId;
+  const { 
+    language = "english", 
+    category, 
+    difficulty, 
+    status = "active",
+    limit = 10,
+    page = 1 
+  } = req.query;
+  
+  try {
+    console.log("\n=== FRONTEND APP - FETCHING QUESTIONS ===");
+    console.log("Current user ID:", userId);
+    console.log("Filters:", { language, category, difficulty, status });
+
+    // Build filter object
+    const filter = {
+      userId: { $ne: userId }, // Not equal to current user
+      status: status,
+      language: language
+    };
+
+    if (category) filter.category = category;
+    if (difficulty) filter.difficulty = difficulty;
+
+    // Calculate pagination
+    const skip = (page - 1) * limit;
+
+    // Get questions with pagination
+    const questions = await Quiz.find(filter)
+      .select('question options correctAnswer category subCategory difficulty language tags usageCount successRate createdAt userId')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const totalCount = await Quiz.countDocuments(filter);
+
+    console.log("Found questions:", questions.length);
+
+    return res.status(200).json({
+      success: true,
+      message: "Questions fetched from studentquizzes collection",
+      data: {
+        questions: questions,
+        pagination: {
+          total: totalCount,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(totalCount / limit)
+        },
+        filters: { language, category, difficulty, status },
+        collection: "studentquizzes"
+      }
+    });
+    
+  } catch (error) {
+    console.error("❌ FRONTEND APP - Error fetching questions:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch from studentquizzes collection",
+      error: error.message,
+    });
+  }
+});
+
+// ✅ KEEPING ALL YOUR EXISTING ADMIN ROUTES AS-IS
+
+// GET ALL QUIZZES - Admin Management
 router.get("/manage-quizzes", authenticateToken, async (req, res) => {
   try {
     console.log("📋 Fetching all quizzes for management...");
@@ -62,7 +261,7 @@ router.get("/manage-quizzes", authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ CREATE NEW QUIZ ENDPOINT
+// CREATE NEW QUIZ ENDPOINT
 router.post("/manage-quizzes", authenticateToken, async (req, res) => {
   try {
     const { question, options, correctAnswer, category, subCategory } = req.body;
@@ -170,8 +369,6 @@ router.post("/manage-quizzes", authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ UPDATE EXISTING QUIZ ROUTES FOR BULK OPERATIONS
-
 // BULK UPDATE CATEGORIES FOR ADMIN QUIZZES
 router.put("/manage-quizzes/bulk-category", authenticateToken, async (req, res) => {
   try {
@@ -224,7 +421,7 @@ router.delete("/manage-quizzes/bulk-delete", authenticateToken, async (req, res)
       });
     }
     
-    // ✅ ALSO FIX: Use 'new' with ObjectId constructor
+    // Use 'new' with ObjectId constructor
     const objectIds = quizIds.map(id => new mongoose.Types.ObjectId(id));
     
     // Perform bulk deletion
@@ -248,7 +445,7 @@ router.delete("/manage-quizzes/bulk-delete", authenticateToken, async (req, res)
   }
 });
 
-// ✅ DELETE QUIZ BY ID
+// DELETE QUIZ BY ID
 router.delete("/manage-quizzes/:quizId", authenticateToken, async (req, res) => {
   try {
     const { quizId } = req.params;
@@ -296,7 +493,7 @@ router.delete("/manage-quizzes/:quizId", authenticateToken, async (req, res) => 
   }
 });
 
-// ✅ UPDATE QUIZ BY ID
+// UPDATE QUIZ BY ID
 router.put("/manage-quizzes/:quizId", authenticateToken, async (req, res) => {
   try {
     const { quizId } = req.params;
@@ -410,7 +607,7 @@ router.put("/manage-quizzes/:quizId", authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ GET SINGLE QUIZ BY ID
+// GET SINGLE QUIZ BY ID
 router.get("/manage-quizzes/:quizId", authenticateToken, async (req, res) => {
   try {
     const { quizId } = req.params;
@@ -466,7 +663,7 @@ router.get("/manage-quizzes/:quizId", authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ STUDENT QUIZ SUBMISSION ROUTES
+// ✅ KEEPING ALL YOUR STUDENT SUBMISSION ROUTES AS-IS
 
 // GET ALL STUDENT SUBMISSIONS (Admin View)
 router.get("/student-submissions", authenticateToken, async (req, res) => {
@@ -825,7 +1022,5 @@ router.post("/student-submissions", authenticateToken, async (req, res) => {
     });
   }
 });
-
-
 
 export default router;
