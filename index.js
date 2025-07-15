@@ -20,7 +20,7 @@ const corsOption = {
       'exp://192.168.18.112:8081',  // Expo app (device/emulator)
       'exp://localhost:8081',       // Expo app (local)
       'https://b4ai.netlify.app',
-      'http://localhost:3001', // Local development
+      'http://localhost:3000', // Local development
     ];
 
     // Check if the origin is in the allowed list
