@@ -1,4 +1,4 @@
-// Update your routes/quiz.route.js file with these fixed routes
+import mongoose from "mongoose";
 
 import express from "express";
 import { addCategory, addQuestion, getQuestion } from "../controllers/quiz-controller.js";
@@ -13,8 +13,6 @@ const router = express.Router();
 router.post("/add-question", addQuestion);
 router.put("/add-category/:questionId", addCategory);
 router.get("/get-question", authenticateToken, getQuestion);
-
-// ✅ NEW MANAGEMENT ROUTES WITH CORRECT MODEL
 
 // ✅ GET ALL QUIZZES - Admin Management
 router.get("/manage-quizzes", authenticateToken, async (req, res) => {
@@ -167,6 +165,84 @@ router.post("/manage-quizzes", authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to create quiz",
+      error: error.message
+    });
+  }
+});
+
+// ✅ UPDATE EXISTING QUIZ ROUTES FOR BULK OPERATIONS
+
+// BULK UPDATE CATEGORIES FOR ADMIN QUIZZES
+router.put("/manage-quizzes/bulk-category", authenticateToken, async (req, res) => {
+  try {
+    const { quizIds, category, subCategory } = req.body;
+    
+    console.log("📂 BULK CATEGORY UPDATE REQUEST");
+    console.log("📝 Quiz IDs:", quizIds);
+    console.log("🔍 New Category:", { category, subCategory });
+    
+    if (!quizIds || !Array.isArray(quizIds) || quizIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Quiz IDs are required"
+      });
+    }
+    
+    // Perform bulk category update
+    const result = await Quiz.bulkUpdateCategory(quizIds, category, subCategory);
+    
+    console.log("📂 Bulk category update completed:", result);
+    
+    res.json({
+      success: true,
+      message: `${result.modifiedCount} quizzes updated successfully`,
+      modifiedCount: result.modifiedCount
+    });
+    
+  } catch (error) {
+    console.error("❌ Bulk category update error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update quiz categories",
+      error: error.message
+    });
+  }
+});
+
+// BULK DELETE ADMIN QUIZZES
+router.delete("/manage-quizzes/bulk-delete", authenticateToken, async (req, res) => {
+  try {
+    const { quizIds } = req.body;
+    console.log("🗑️ BULK DELETE ADMIN QUIZZES REQUEST");
+    console.log("📝 Quiz IDs:", quizIds);
+    console.log("🔍 Requested by:", req.user?.userId);
+    
+    if (!quizIds || !Array.isArray(quizIds) || quizIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Quiz IDs are required"
+      });
+    }
+    
+    // ✅ ALSO FIX: Use 'new' with ObjectId constructor
+    const objectIds = quizIds.map(id => new mongoose.Types.ObjectId(id));
+    
+    // Perform bulk deletion
+    const result = await Quiz.deleteMany({ _id: { $in: objectIds } });
+    
+    console.log("🗑️ Bulk deletion completed:", result);
+    
+    res.json({
+      success: true,
+      message: `${result.deletedCount} quizzes deleted successfully`,
+      deletedCount: result.deletedCount
+    });
+    
+  } catch (error) {
+    console.error("❌ Bulk delete error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete quizzes",
       error: error.message
     });
   }
@@ -750,80 +826,6 @@ router.post("/student-submissions", authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ UPDATE EXISTING QUIZ ROUTES FOR BULK OPERATIONS
 
-// BULK UPDATE CATEGORIES FOR ADMIN QUIZZES
-router.put("/manage-quizzes/bulk-category", authenticateToken, async (req, res) => {
-  try {
-    const { quizIds, category, subCategory } = req.body;
-    
-    console.log("📂 BULK CATEGORY UPDATE REQUEST");
-    console.log("📝 Quiz IDs:", quizIds);
-    console.log("🔍 New Category:", { category, subCategory });
-    
-    if (!quizIds || !Array.isArray(quizIds) || quizIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Quiz IDs are required"
-      });
-    }
-    
-    // Perform bulk category update
-    const result = await Quiz.bulkUpdateCategory(quizIds, category, subCategory);
-    
-    console.log("📂 Bulk category update completed:", result);
-    
-    res.json({
-      success: true,
-      message: `${result.modifiedCount} quizzes updated successfully`,
-      modifiedCount: result.modifiedCount
-    });
-    
-  } catch (error) {
-    console.error("❌ Bulk category update error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update quiz categories",
-      error: error.message
-    });
-  }
-});
-
-// BULK DELETE ADMIN QUIZZES
-router.delete("/manage-quizzes/bulk-delete", authenticateToken, async (req, res) => {
-  try {
-    const { quizIds } = req.body;
-    
-    console.log("🗑️ BULK DELETE ADMIN QUIZZES REQUEST");
-    console.log("📝 Quiz IDs:", quizIds);
-    console.log("🔍 Requested by:", req.user?.userId);
-    
-    if (!quizIds || !Array.isArray(quizIds) || quizIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Quiz IDs are required"
-      });
-    }
-    
-    // Perform bulk deletion
-    const result = await Quiz.bulkDelete(quizIds);
-    
-    console.log("🗑️ Bulk deletion completed:", result);
-    
-    res.json({
-      success: true,
-      message: `${result.deletedCount} quizzes deleted successfully`,
-      deletedCount: result.deletedCount
-    });
-    
-  } catch (error) {
-    console.error("❌ Bulk delete error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to delete quizzes",
-      error: error.message
-    });
-  }
-});
 
 export default router;

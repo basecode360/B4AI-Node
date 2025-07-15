@@ -35,7 +35,7 @@ const quizSchema = new mongoose.Schema({
   // ✅ NEW: Language support
   language: {
     type: String,
-    enum: ["english", "urdu", "arabic", "french", "spanish", "german"],
+    enum: ["english", "french", "spanish", "german"],
     default: "english",
     required: true,
   },
