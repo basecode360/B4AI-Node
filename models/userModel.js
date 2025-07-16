@@ -30,28 +30,43 @@ const userSchema = new mongoose.Schema({
     lastName: {
       type: String,
     },
-    DOB: {
+    // ✅ UPDATED: DOB -> dateOfBirth
+    dateOfBirth: {
       type: String,
     },
+    // ✅ UPDATED: Gender enum expanded to match frontend
     gender: {
       type: String,
-      enum: ["male", "female"],
+      enum: ["male", "female", "other", "not_specified"],
       required: true,
-      default: "male",
+      default: "not_specified",
     },
+    // ✅ UPDATED: institution -> institute
     institute: {
       type: String,
     },
+    // ✅ UPDATED: country -> countryOfResidence
+    countryOfResidence: {
+      type: String,
+    },
+    // ✅ UPDATED: educationalStatus -> educationStatus
+    educationStatus: {
+      type: String,
+      default: "student",
+    },
+    // ✅ UPDATED: address -> residence
     residence: {
       type: String,
     },
-    DOG: {
+    // ✅ UPDATED: DOG -> dateOfGraduation
+    dateOfGraduation: {
       type: String,
     },
+    // ✅ UPDATED: specialty -> speciality
     speciality: {
       type: String,
     },
-    // ✅ Added social media fields
+    // ✅ Social media fields
     facebookUrl: {
       type: String,
       default: "",
@@ -65,6 +80,27 @@ const userSchema = new mongoose.Schema({
       default: "",
     },
   },
+  // ✅ Added timestamps
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  lastLogin: {
+    type: Date,
+  },
+  lastActive: {
+    type: Date,
+  },
+});
+
+// ✅ Update updatedAt on save
+userSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
 });
 
 export const userModel =

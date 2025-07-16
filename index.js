@@ -4,8 +4,10 @@ import cors from "cors";
 import connectDB from "./utils/db.js";
 import authRoutes from "./routes/user.route.js";
 import quizRoute from "./routes/quiz.route.js";
+import studentQuizRoute from "./routes/studentquiz.route.js"; // ✅ NEW IMPORT
 import analyticsRoute from "./routes/analytics.route.js";
 import cookieParser from "cookie-parser";
+import universitiesRoutes from './routes/universities.js';
 
 // Load environment variables
 dotenv.config();
@@ -43,7 +45,6 @@ const corsOption = {
   optionsSuccessStatus: 200  // For legacy browser support
 };
 
-
 // Middleware setup
 app.use(cors(corsOption));
 app.use(express.json());
@@ -72,10 +73,12 @@ app.get("/health", (req, res) => {
   });
 });
 
-// api routes
+// ✅ FIXED: All routes now use consistent /api/v1/ prefix
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/quiz", quizRoute);
+app.use("/api/v1/student-quiz", studentQuizRoute);
 app.use("/api/v1/analytics", analyticsRoute);
+app.use('/api/v1/universities', universitiesRoutes); 
 
 // Start server
 app.listen(PORT, HOST, () => {
@@ -83,6 +86,7 @@ app.listen(PORT, HOST, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`🚀 Server running on http://${HOST}:${PORT}`);
   console.log(`🌐 Network access: http://192.168.18.112:${PORT}`);
+  console.log(`📚 Universities API: http://${HOST}:${PORT}/api/v1/universities`); // ✅ Added for debugging
 });
 
 export default app;

@@ -41,21 +41,33 @@ router.get("/users", async (req, res) => {
       .sort({ createdAt: -1 }); // Latest first
     
     console.log(`📊 Found ${users.length} users in MongoDB database`);
-    console.log('📋 Sample user structure:', users[0] ? {
-      _id: users[0]._id,
-      email: users[0].email,
-      role: users[0].role,
-      profile: users[0].profile,
-      isVerified: users[0].isVerified,
-      createdAt: users[0].createdAt
-    } : 'No users found');
     
-    // Transform data for frontend compatibility
+    // ✅ Transform data for frontend compatibility - map backend fields to frontend expectations
     const transformedUsers = users.map(user => ({
       _id: user._id,
       email: user.email,
       role: user.role || 'student',
-      profile: user.profile || {},
+      profile: {
+        ...user.profile,
+        // ✅ Map backend field names to what frontend expects (if needed for display)
+        firstName: user.profile?.firstName,
+        lastName: user.profile?.lastName,
+        // Keep both for compatibility
+        DOB: user.profile?.dateOfBirth,          // Legacy field
+        dateOfBirth: user.profile?.dateOfBirth,  // New field
+        DOG: user.profile?.dateOfGraduation,     // Legacy field  
+        dateOfGraduation: user.profile?.dateOfGraduation, // New field
+        institute: user.profile?.institute,
+        institution: user.profile?.institute,    // For frontend compatibility
+        countryOfResidence: user.profile?.countryOfResidence,
+        country: user.profile?.countryOfResidence, // For frontend compatibility
+        educationStatus: user.profile?.educationStatus,
+        educationalStatus: user.profile?.educationStatus, // For frontend compatibility
+        residence: user.profile?.residence,
+        address: user.profile?.residence,        // For frontend compatibility
+        speciality: user.profile?.speciality,
+        specialty: user.profile?.speciality,     // For frontend compatibility
+      },
       createdAt: user.createdAt,
       lastLogin: user.lastLogin,
       isVerified: user.isVerified || false,
@@ -78,6 +90,7 @@ router.get("/users", async (req, res) => {
     });
   }
 });
+
 
 // ✅ DATABASE INTEGRATED: USER STATS ENDPOINT (for dashboard)
 router.get("/stats", async (req, res) => {
@@ -346,8 +359,7 @@ router.put("/users/email/:email", authenticateToken, async (req, res) => {
     const updateData = req.body;
     
     console.log("✏️ UPDATE BY EMAIL REQUEST:", decodedEmail);
-    console.log("📝 Update data:", updateData);
-    console.log("🔍 Requested by user ID:", req.user?.userId);
+    console.log("📝 Update data received:", updateData);
     
     // Find user by email
     const existingUser = await userModel.findOne({ 
@@ -362,20 +374,13 @@ router.put("/users/email/:email", authenticateToken, async (req, res) => {
       });
     }
     
-    console.log("✅ User found for update:", {
-      _id: existingUser._id,
-      email: existingUser.email,
-      name: `${existingUser.profile?.firstName || ''} ${existingUser.profile?.lastName || ''}`.trim()
-    });
-    
     // Prepare update object
     const updateFields = {
       updatedAt: new Date()
     };
     
-    // Handle email update (if changing to a different email)
+    // Handle email update
     if (updateData.email && updateData.email.toLowerCase() !== existingUser.email.toLowerCase()) {
-      // Check if new email already exists
       const emailExists = await userModel.findOne({ 
         email: updateData.email.toLowerCase(),
         _id: { $ne: existingUser._id }
@@ -401,15 +406,50 @@ router.put("/users/email/:email", authenticateToken, async (req, res) => {
       updateFields.isVerified = updateData.isVerified;
     }
     
-    // Handle profile updates
+    // ✅ Handle profile updates with field mapping
     if (updateData.profile) {
-      updateFields.profile = {
-        ...existingUser.profile?.toObject?.() || existingUser.profile || {},
-        ...updateData.profile
-      };
+      const existingProfile = existingUser.profile?.toObject?.() || existingUser.profile || {};
+      
+      // ✅ Map frontend fields to backend model fields
+      const mappedProfile = { ...existingProfile };
+      
+      // Direct field updates
+      if (updateData.profile.firstName !== undefined) mappedProfile.firstName = updateData.profile.firstName;
+      if (updateData.profile.lastName !== undefined) mappedProfile.lastName = updateData.profile.lastName;
+      if (updateData.profile.gender !== undefined) mappedProfile.gender = updateData.profile.gender;
+      if (updateData.profile.profilePic !== undefined) mappedProfile.profilePic = updateData.profile.profilePic;
+      
+      // ✅ Field mapping updates
+      if (updateData.profile.dateOfBirth !== undefined) mappedProfile.dateOfBirth = updateData.profile.dateOfBirth;
+      if (updateData.profile.DOB !== undefined) mappedProfile.dateOfBirth = updateData.profile.DOB; // Legacy support
+      
+      if (updateData.profile.dateOfGraduation !== undefined) mappedProfile.dateOfGraduation = updateData.profile.dateOfGraduation;
+      if (updateData.profile.DOG !== undefined) mappedProfile.dateOfGraduation = updateData.profile.DOG; // Legacy support
+      
+      if (updateData.profile.institute !== undefined) mappedProfile.institute = updateData.profile.institute;
+      if (updateData.profile.institution !== undefined) mappedProfile.institute = updateData.profile.institution; // Frontend compatibility
+      
+      if (updateData.profile.countryOfResidence !== undefined) mappedProfile.countryOfResidence = updateData.profile.countryOfResidence;
+      if (updateData.profile.country !== undefined) mappedProfile.countryOfResidence = updateData.profile.country; // Frontend compatibility
+      
+      if (updateData.profile.educationStatus !== undefined) mappedProfile.educationStatus = updateData.profile.educationStatus;
+      if (updateData.profile.educationalStatus !== undefined) mappedProfile.educationStatus = updateData.profile.educationalStatus; // Frontend compatibility
+      
+      if (updateData.profile.residence !== undefined) mappedProfile.residence = updateData.profile.residence;
+      if (updateData.profile.address !== undefined) mappedProfile.residence = updateData.profile.address; // Frontend compatibility
+      
+      if (updateData.profile.speciality !== undefined) mappedProfile.speciality = updateData.profile.speciality;
+      if (updateData.profile.specialty !== undefined) mappedProfile.speciality = updateData.profile.specialty; // Frontend compatibility
+      
+      // Social media fields
+      if (updateData.profile.facebookUrl !== undefined) mappedProfile.facebookUrl = updateData.profile.facebookUrl;
+      if (updateData.profile.twitterUrl !== undefined) mappedProfile.twitterUrl = updateData.profile.twitterUrl;
+      if (updateData.profile.instagramUrl !== undefined) mappedProfile.instagramUrl = updateData.profile.instagramUrl;
+      
+      updateFields.profile = mappedProfile;
     }
     
-    console.log("📋 Final update fields:", updateFields);
+    console.log("📋 Final update fields with mapping:", updateFields);
     
     // Update user by email
     const updatedUser = await userModel.findOneAndUpdate(
