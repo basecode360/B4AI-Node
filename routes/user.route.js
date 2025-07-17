@@ -13,7 +13,9 @@ import {
   resetPassword,
 } from "../controllers/user.controller.js";
 import { singleUpload } from "../middleware/multer.js";
-import { userModel } from "../models/userModel.js"; // ✅ Using your existing model
+import { userModel } from "../models/userModel.js";
+import PerformanceAnalytics from "../models/PerformanceAnalytics.js"; // 🆕 Import for cleanup
+import { Quiz } from "../models/quizModel.js"; // 🆕 Import for cleanup
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs"; // Add this import
 import { sendEmail } from "../utils/emailService.js"; // Add this import
@@ -335,6 +337,7 @@ router.get("/stats", async (req, res) => {
     });
   }
 });
+
 
 // ✅ DELETE USER BY EMAIL
 router.delete("/users/email/:email", authenticateToken, async (req, res) => {

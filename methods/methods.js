@@ -15,7 +15,7 @@ const generateCode = () => {
 const sentEmail = async (email, subject, emailContent) => {
   try {
     const smtpResponse = await transporter.sendMail({
-      from: `"Board Bullets Team" <${process.env.EMAIL_USER}>`,
+      from: `"B4AI Team" <${process.env.EMAIL_USER}>`,
       to: `${email}`,
       subject: `${subject}`,
       html: `${emailContent}`,
@@ -30,7 +30,7 @@ const sentEmail = async (email, subject, emailContent) => {
 // Email template for verification code
 const getVerificationEmailTemplate = (code, firstName) => {
   return {
-    subject: "Verify Your BoardBullets Account",
+    subject: "Verify Your B4ai Account",
     html: `
         <!DOCTYPE html>
         <html>
@@ -52,12 +52,12 @@ const getVerificationEmailTemplate = (code, firstName) => {
         <body>
           <div class="container">
             <div class="header">
-              <h1>BOARDBULLETS</h1>
+              <h1>B4AI</h1>
               <p>Learn & Earn</p>
             </div>
             <div class="content">
-              <h2>Welcome ${firstName ? firstName : "to BoardBullets"}!</h2>
-              <p>Thank you for registering with BoardBullets. To complete your account setup, please verify your email address using the code below:</p>
+              <h2>Welcome ${firstName ? firstName : "to B4ai"}!</h2>
+              <p>Thank you for registering with B4ai. To complete your account setup, please verify your email address using the code below:</p>
               
               <div class="code-box">
                 <p style="margin: 0; font-size: 16px;">Your Verification Code</p>
@@ -73,17 +73,17 @@ const getVerificationEmailTemplate = (code, firstName) => {
               
               <p>If you have any questions, feel free to contact our support team.</p>
               
-              <p>Best regards,<br>The BoardBullets Team</p>
+              <p>Best regards,<br>The B4ai Team</p>
             </div>
             <div class="footer">
-              <p>© 2017 BoardBullets, Inc. | Privacy Policy | Terms of Service</p>
+              <p>© 2017 B4ai, Inc. | Privacy Policy | Terms of Service</p>
             </div>
           </div>
         </body>
         </html>
       `,
     text: `
-        Welcome to BoardBullets!
+        Welcome to B4ai!
         
         Your verification code is: ${code}
         
@@ -93,7 +93,7 @@ const getVerificationEmailTemplate = (code, firstName) => {
         If you didn't request this, please ignore this email.
         
         Best regards,
-        The BoardBullets Team
+        The B4ai Team
       `,
   };
 };
@@ -117,7 +117,7 @@ const sendVerificationEmail = async (email, code, firstName) => {
 
     const mailOptions = {
       from: {
-        name: "BoardBullets",
+        name: "B4ai",
         address: process.env.EMAIL_USER,
       },
       to: email,

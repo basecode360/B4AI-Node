@@ -7,7 +7,6 @@ import quizRoute from "./routes/quiz.route.js";
 import studentQuizRoute from "./routes/studentquiz.route.js"; // ✅ NEW IMPORT
 import analyticsRoute from "./routes/analytics.route.js";
 import universitiesRoutes from "./routes/universities.route.js";
-import studentQuizRoute from "./routes/studentQuiz.route.js";
 import cookieParser from "cookie-parser";
 import universitiesRoutes from './routes/universities.js';
 
@@ -81,6 +80,11 @@ app.get("/", (req, res) => {
     port: PORT,
     host: HOST,
     timestamp: new Date().toISOString(),
+    availableRoutes: [
+      "/api/v1/auth - Authentication routes",
+      "/api/v1/quiz - Quiz management routes", 
+      "/api/v1/analytics - Analytics and performance routes" // 🆕 Added analytics info
+    ]
   });
 });
 
@@ -130,7 +134,116 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
+app.use("/api/v1/quiz", (req, res, next) => {
+  console.log(`🧠 Quiz route accessed: ${req.method} ${req.path}`);
+  next();
+}, quizRoute);
+
+app.use("/api/v1/analytics", (req, res, next) => {
+  console.log(`📊 Analytics route accessed: ${req.method} ${req.path}`);
+  next();
+}, analyticsRoute); // 🆕 Analytics route with logging
+
+// 🆕 API Documentation endpoint
+app.get("/api", (req, res) => {
+  res.json({
+    message: "BoardBullets API Documentation",
+    version: "1.0.0",
+    endpoints: {
+      auth: {
+        base: "/api/v1/auth",
+        routes: [
+          "POST /register - User registration",
+          "POST /login - User login",
+          "POST /verify-email - Email verification",
+          "GET /profile/:userId - Get user profile",
+          "PUT /update-profile - Update user profile",
+          "POST /logout - User logout",
+          "POST /forgot-password - Forgot password",
+          "POST /reset-password - Reset password"
+        ]
+      },
+      quiz: {
+        base: "/api/v1/quiz",
+        routes: [
+          "GET /get-question - Get quiz questions",
+          "POST /add-question - Add new question",
+          "PUT /add-category/:questionId - Add category to question",
+          "GET /manage-quizzes - Admin: Get all quizzes",
+          "POST /manage-quizzes - Admin: Create new quiz",
+          "PUT /manage-quizzes/:quizId - Admin: Update quiz",
+          "DELETE /manage-quizzes/:quizId - Admin: Delete quiz",
+          "GET /student-submissions - Admin: Get student submissions",
+          "POST /student-submissions - Submit quiz for review"
+        ]
+      },
+      analytics: {
+        base: "/api/v1/analytics",
+        routes: [
+          "POST /update-analytics - Update user analytics after quiz",
+          "GET /user-stats - Get user performance statistics",
+          "GET /last-quiz - Get last quiz details",
+          "GET /bb-points-summary - Get BB Points summary",
+          "GET /overview - Get complete analytics overview",
+          "GET /leaderboard - Get leaderboard data",
+          "DELETE /reset-analytics - Reset user analytics (testing)"
+        ]
+      }
+    }
+  });
+});
+
+// 🆕 Enhanced error handling middleware
+app.use((err, req, res, next) => {
+  console.error(`❌ Error occurred: ${err.message}`);
+  console.error(`📍 Route: ${req.method} ${req.path}`);
+  console.error(`🔍 Stack: ${err.stack}`);
+  
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({
+      success: false,
+      message: "Validation Error",
+      errors: Object.values(err.errors).map(e => e.message)
+    });
+  }
+  
+  if (err.name === 'CastError') {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid ID format"
+    });
+  }
+  
+  if (err.code === 11000) {
+    return res.status(409).json({
+      success: false,
+      message: "Resource already exists"
+    });
+  }
+  
+  res.status(500).json({
+    success: false,
+    message: "Internal server error",
+    error: process.env.NODE_ENV === 'development' ? err.message : "Something went wrong"
+  });
+});
+
+// 🆕 Handle 404 for unknown routes
+app.use((req, res) => {
+  console.log(`❌ 404 - Route not found: ${req.method} ${req.path}`);
+  res.status(404).json({
+    success: false,
+    message: "Route not found",
+    requestedRoute: `${req.method} ${req.path}`,
+    availableRoutes: [
+      "/api/v1/auth",
+      "/api/v1/quiz", 
+      "/api/v1/analytics"
+    ]
+  });
+});
+
+// Start server with enhanced logging
 app.listen(PORT, HOST, () => {
   connectDB();
   console.log(`🚀 Server is running on port ${PORT}`);
@@ -151,7 +264,5 @@ process.on('SIGTERM', () => {
   });
 });
 
-  console.log(`📚 Universities API: http://${HOST}:${PORT}/api/v1/universities`); // ✅ Added for debugging
-});
 
 export default app;
