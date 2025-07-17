@@ -49,6 +49,48 @@ router.post('/update-analytics', authenticateToken, async (req, res) => {
       analytics = new PerformanceAnalytics({ userId });
     }
     
+    // Basic stats update karo
+    analytics.totalQuizzesTaken += 1;
+    analytics.totalQuestionsAttempted += totalQuestions;
+    analytics.totalCorrectQuestions += correctAnswers;
+    analytics.cumulativeScore += Math.round((correctAnswers / totalQuestions) * 100);
+    
+    // Mode ke hisab se time update karo
+    if (!analytics.timeStats) {
+      analytics.timeStats = {
+        TIMED: 0,
+        UNTIMED: 0,
+        TUTOR: 0,
+        'ON-THE-GO': 0
+      };
+    }
+    analytics.timeStats[quizMode] = (analytics.timeStats[quizMode] || 0) + timeSpent;
+
+      // Time per question stats update karo
+    if (questionTimes && questionTimes.length > 0) {
+      const avgTime = questionTimes.reduce((sum, time) => sum + time, 0) / questionTimes.length;
+      const fastest = Math.min(...questionTimes);
+      const slowest = Math.max(...questionTimes);
+      
+      if (!analytics.timePerQuestionStats) {
+        analytics.timePerQuestionStats = {
+          averageTime: 0,
+          fastestTime: 0,
+          slowestTime: 0
+        };
+      }
+      
+      const totalQuizzes = analytics.totalQuizzesTaken;
+      analytics.timePerQuestionStats.averageTime = 
+        ((analytics.timePerQuestionStats.averageTime * (totalQuizzes - 1)) + avgTime) / totalQuizzes;
+      
+      analytics.timePerQuestionStats.fastestTime = 
+        analytics.timePerQuestionStats.fastestTime === 0 ? 
+        fastest : Math.min(analytics.timePerQuestionStats.fastestTime, fastest);
+      
+      analytics.timePerQuestionStats.slowestTime = 
+        Math.max(analytics.timePerQuestionStats.slowestTime, slowest);
+    }
     // Use the model method to update analytics
     await analytics.updateAfterQuiz({
       quizMode,
@@ -60,10 +102,12 @@ router.post('/update-analytics', authenticateToken, async (req, res) => {
       category,
       difficulty
     });
+
+    await analytics.save();
     
     console.log('✅ Analytics successfully updated');
-    
-    return res.status(200).json({
+      
+   return res.status(200).json({
       success: true,
       message: 'Analytics updated successfully!',
       analytics: {
@@ -212,7 +256,8 @@ router.get('/admin/all-stats', authenticateToken, async (req, res) => {
         totalPages: Math.ceil(totalCount / limit),
         totalCount,
         hasMore: skip + analytics.length < totalCount
-      }
+      },
+      count: transformedAnalytics.length
     });
     
   } catch (error) {
@@ -243,13 +288,36 @@ router.get('/admin/summary', authenticateToken, async (req, res) => {
           totalCorrectQuestions: { $sum: "$totalCorrectQuestions" },
           avgAccuracy: { $avg: "$accuracyPercentage" },
           avgCumulativeScore: { $avg: "$cumulativeScore" },
+        }}]
+        const totalUsersWithAnalytics = await PerformanceAnalytics.countDocuments();
+    
+    // Total quizzes taken across all users
+    const totalQuizzesTaken = await PerformanceAnalytics.aggregate([
+      { $group: { _id: null, total: { $sum: "$totalQuizzesTaken" } } }
+    ]);
+    
+    // Total questions attempted across all users
+    const totalQuestionsAttempted = await PerformanceAnalytics.aggregate([
+      { $group: { _id: null, total: { $sum: "$totalQuestionsAttempted" } } }
+    ]);
+    
+    // Average accuracy across all users
+    const averageAccuracy = await PerformanceAnalytics.aggregate([
+      { $group: { _id: null, avgAccuracy: { $avg: "$accuracyPercentage" } } }
+    ]);
+    
+    // Mode-wise time distribution
+    const modeTimeStats = await PerformanceAnalytics.aggregate([
+      {
+        $group: {
+          _id: null,
           totalTimedTime: { $sum: "$timeStats.TIMED" },
           totalUntimedTime: { $sum: "$timeStats.UNTIMED" },
           totalTutorTime: { $sum: "$timeStats.TUTOR" },
           totalOnTheGoTime: { $sum: "$timeStats.ON-THE-GO" }
         }
       }
-    ];
+    ]);
     
     const [summary] = await PerformanceAnalytics.aggregate(summaryPipeline);
     
@@ -286,10 +354,10 @@ router.get('/admin/summary', authenticateToken, async (req, res) => {
       success: true,
       summary: {
         totalUsersWithAnalytics: summary?.totalUsers || 0,
-        totalQuizzesTaken: summary?.totalQuizzesTaken || 0,
-        totalQuestionsAttempted: summary?.totalQuestionsAttempted || 0,
+        totalQuizzesTaken: summary?.totalQuizzesTaken || totalQuizzesTaken[0]?.total || 0,
+        totalQuestionsAttempted: summary?.totalQuestionsAttempted || totalQuestionsAttempted[0]?.total || 0,
         totalCorrectQuestions: summary?.totalCorrectQuestions || 0,
-        averageAccuracy: Math.round(summary?.avgAccuracy || 0),
+        averageAccuracy: Math.round(averageAccuracy[0]?.avgAccuracy || 0),
         averageCumulativeScore: Math.round(summary?.avgCumulativeScore || 0),
         modeTimeDistribution: {
           totalTimedTime: summary?.totalTimedTime || 0,
