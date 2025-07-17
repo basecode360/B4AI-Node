@@ -35,13 +35,43 @@ router.post("/reset-password", resetPassword);
 // ✅ ADMIN CREATE USER ENDPOINT WITH EMAIL
 router.post("/admin/create-user", authenticateToken, async (req, res) => {
   try {
-    // Check if the requester is an admin
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({
+    console.log("🔧 DEBUG: Admin create user endpoint hit");
+    console.log("🔧 DEBUG: req.user from middleware:", req.user);
+    console.log("🔧 DEBUG: req.user.userId:", req.user?.userId);
+
+    // ✅ FIRST: Get the requesting user from database to check their role
+    const requestingUser = await userModel.findById(req.user.userId);
+    console.log("🔧 DEBUG: Found requesting user:", {
+      _id: requestingUser?._id,
+      email: requestingUser?.email,
+      role: requestingUser?.role,
+      exists: !!requestingUser
+    });
+
+    // Check if the requester exists
+    if (!requestingUser) {
+      console.log("❌ DEBUG: Requesting user not found in database");
+      return res.status(404).json({
         success: false,
-        message: "Only admins can create users"
+        message: "Requesting user not found"
       });
     }
+
+    // ✅ NOW check if the requester is an admin
+    if (requestingUser.role !== 'admin') {
+      console.log("❌ DEBUG: Role check failed - Expected: admin, Got:", requestingUser.role);
+      return res.status(403).json({
+        success: false,
+        message: `Only admins can create users. Your role: ${requestingUser.role}`,
+        debug: {
+          userId: req.user.userId,
+          userRole: requestingUser.role,
+          requiredRole: 'admin'
+        }
+      });
+    }
+
+    console.log("✅ DEBUG: Admin role verified successfully");
 
     const { email, password, role, profile, sendWelcomeEmail } = req.body;
 
@@ -84,7 +114,7 @@ router.post("/admin/create-user", authenticateToken, async (req, res) => {
         educationStatus: profile?.educationStatus || 'student',
         residence: profile?.residence || '',
         dateOfGraduation: profile?.dateOfGraduation || '',
-        speciality: profile?.speciality || '',
+        specialty: profile?.specialty || '',
         facebookUrl: profile?.facebookUrl || '',
         twitterUrl: profile?.twitterUrl || '',
         instagramUrl: profile?.instagramUrl || '',

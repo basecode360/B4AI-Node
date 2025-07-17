@@ -667,7 +667,7 @@ const updateProfile = async (req, res) => {
       institute,
       residence,
       DOG,
-      speciality,
+      specialty,
       facebookUrl,
       twitterUrl,
       instagramUrl,
@@ -676,7 +676,7 @@ const updateProfile = async (req, res) => {
     const profilePic = req.file;
 
     console.log("🔍 Extracted fields:", {
-      firstName, lastName, DOB, gender, institute, residence, DOG, speciality
+      firstName, lastName, DOB, gender, institute, residence, DOG, specialty
     });
     console.log("🔍 Social Media URLs:", { facebookUrl, twitterUrl, instagramUrl });
     console.log("🔍 Profile Pic:", profilePic ? "Present" : "Not present");
@@ -762,7 +762,7 @@ const updateProfile = async (req, res) => {
     if (institute) updatedProfile.institute = institute;
     if (residence) updatedProfile.residence = residence;
     if (DOG) updatedProfile.DOG = DOG;
-    if (speciality) updatedProfile.speciality = speciality;
+    if (specialty) updatedProfile.specialty = specialty;
 
     // Add social media URLs (even if empty, to allow clearing)
     updatedProfile.facebookUrl = facebookUrl || "";

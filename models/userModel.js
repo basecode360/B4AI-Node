@@ -62,8 +62,8 @@ const userSchema = new mongoose.Schema({
     dateOfGraduation: {
       type: String,
     },
-    // ✅ UPDATED: specialty -> speciality
-    speciality: {
+    // ✅ UPDATED: specialty -> specialty
+    specialty: {
       type: String,
     },
     // ✅ Social media fields
