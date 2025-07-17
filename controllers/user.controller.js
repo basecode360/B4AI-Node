@@ -12,7 +12,35 @@ import cloudinary from "../utils/cloudinary.js";
 
 const register = async (req, res) => {
   try {
-    const { email, password, firstName, lastName, confirmPassword } = req.body;
+    const { 
+      email, 
+      password, 
+      firstName, 
+      lastName, 
+      confirmPassword,
+      gender,
+      educationalStatus,  // Frontend sends this
+      specialty,          // Frontend sends this  
+      institution,        // Frontend sends this
+      country,           // Frontend sends this
+      dateOfBirth,       // Frontend sends this
+      dateOfGraduation,  // Frontend sends this
+      address            // Frontend sends this
+    } = req.body;
+
+    console.log("📝 Registration data received from frontend:", {
+      email,
+      firstName,
+      lastName,
+      gender,
+      educationalStatus,
+      specialty,
+      institution,
+      country,
+      dateOfBirth,
+      dateOfGraduation,
+      address
+    });
 
     // Validation
     if (!email || !password) {
@@ -97,19 +125,48 @@ const register = async (req, res) => {
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
+    // ✅ FIXED: Map frontend field names to backend model field names
+    const profileData = {
+      firstName: firstName || "",
+      lastName: lastName || "",
+      // ✅ Frontend: dateOfBirth -> Backend: dateOfBirth
+      dateOfBirth: dateOfBirth || "",
+      // ✅ Frontend: dateOfGraduation -> Backend: dateOfGraduation  
+      dateOfGraduation: dateOfGraduation || "",
+      // ✅ Frontend: country -> Backend: countryOfResidence
+      countryOfResidence: country || "",
+      // ✅ Frontend: institution -> Backend: institute
+      institute: institution || "",
+      // ✅ Frontend: address -> Backend: residence
+      residence: address || "",
+      // ✅ Frontend: educationalStatus -> Backend: educationStatus
+      educationStatus: educationalStatus || "student",
+      // ✅ Frontend: specialty -> Backend: speciality
+      speciality: specialty || "",
+      // ✅ Gender mapping
+      gender: gender || "not_specified",
+      // ✅ Initialize social media fields
+      facebookUrl: "",
+      twitterUrl: "",
+      instagramUrl: "",
+    };
+
+    console.log("🔄 Mapped profile data for backend model:", profileData);
+
     // Create new user
     const newUser = new userModel({
       email: email.toLowerCase(),
       password: hashedPassword,
       isVerified: false,
-      profile: {
-        firstName: firstName || "",
-        lastName: lastName || "",
-      },
+      profile: profileData,
     });
+
+    console.log("🔍 User object before save:", JSON.stringify(newUser.toObject(), null, 2));
 
     // Save user to database
     await newUser.save();
+
+    console.log("✅ User saved to database successfully with profile data");
 
     // Generate verification code
     const verificationCode = generateCode();
@@ -161,6 +218,19 @@ const register = async (req, res) => {
       });
     }
 
+    // ✅ Enhanced error logging for validation issues
+    if (error.name === 'ValidationError') {
+      console.error("❌ Validation Error Details:", error.errors);
+      const errorMessages = Object.keys(error.errors).map(key => 
+        `${key}: ${error.errors[key].message}`
+      );
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed: " + errorMessages.join(', '),
+        errors: error.errors
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Internal server error during registration",
@@ -168,7 +238,6 @@ const register = async (req, res) => {
     });
   }
 };
-
 // Verify Email Code Controller
 const verifyEmail = async (req, res) => {
   try {
@@ -662,12 +731,13 @@ const updateProfile = async (req, res) => {
     const {
       firstName,
       lastName,
-      DOB,
+      dateOfBirth,
       gender,
       institute,
       residence,
-      DOG,
-      specialty,
+      countryOfResidence,
+      dateOfGraduation,
+      speciality,
       facebookUrl,
       twitterUrl,
       instagramUrl,
@@ -676,7 +746,7 @@ const updateProfile = async (req, res) => {
     const profilePic = req.file;
 
     console.log("🔍 Extracted fields:", {
-      firstName, lastName, DOB, gender, institute, residence, DOG, specialty
+      firstName, lastName, dateOfBirth, gender, institute, residence, dateOfGraduation, speciality,countryOfResidence
     });
     console.log("🔍 Social Media URLs:", { facebookUrl, twitterUrl, instagramUrl });
     console.log("🔍 Profile Pic:", profilePic ? "Present" : "Not present");
@@ -696,7 +766,7 @@ const updateProfile = async (req, res) => {
       });
     }
     
-    if (!DOB) {
+    if (!dateOfBirth) {
       return res.status(400).json({
         success: false,
         message: "Date of birth is required",
@@ -711,13 +781,13 @@ const updateProfile = async (req, res) => {
     }
 
     // ✅ Date validation
-    if (DOB) {
-      const dobYear = new Date(DOB).getFullYear();
+    if (dateOfBirth) {
+      const dateOfBirthYear = new Date(dateOfBirth).getFullYear();
       const currentYear = new Date().getFullYear();
-      console.log("🔍 DOB Year:", dobYear, "Current Year:", currentYear);
+      console.log("🔍 dateOfBirth Year:", dateOfBirthYear, "Current Year:", currentYear);
       
-      if (dobYear >= currentYear) {
-        console.log("❌ DOB validation failed - returning 400");
+      if (dateOfBirthYear >= currentYear) {
+        console.log("❌ dateOfBirth validation failed - returning 400");
         return res.status(400).json({
           success: false,
           message: "Date of Birth cannot be from current or future years",
@@ -725,13 +795,13 @@ const updateProfile = async (req, res) => {
       }
     }
 
-    if (DOG) {
-      const dogYear = new Date(DOG).getFullYear();
+    if (dateOfGraduation) {
+      const dateOfGraduationYear = new Date(dateOfGraduation).getFullYear();
       const currentYear = new Date().getFullYear();
-      console.log("🔍 DOG Year:", dogYear, "Current Year:", currentYear);
+      console.log("🔍 dateOfGraduation Year:", dateOfGraduationYear, "Current Year:", currentYear);
       
-      if (dogYear >= currentYear) {
-        console.log("❌ DOG validation failed - returning 400");
+      if (dateOfGraduationYear >= currentYear) {
+        console.log("❌ dateOfGraduation validation failed - returning 400");
         return res.status(400).json({
           success: false,
           message: "Date of Graduation cannot be from current or future years",
@@ -754,15 +824,16 @@ const updateProfile = async (req, res) => {
       ...currentUser.profile, // Preserve existing fields
       firstName,
       lastName,
-      DOB,
+      dateOfBirth,
       gender,
     };
 
     // Add optional fields if provided
     if (institute) updatedProfile.institute = institute;
     if (residence) updatedProfile.residence = residence;
-    if (DOG) updatedProfile.DOG = DOG;
-    if (specialty) updatedProfile.specialty = specialty;
+    if (countryOfResidence) updatedProfile.countryOfResidence = countryOfResidence;
+    if (dateOfGraduation) updatedProfile.dateOfGraduation = dateOfGraduation;
+    if (speciality) updatedProfile.speciality = speciality;
 
     // Add social media URLs (even if empty, to allow clearing)
     updatedProfile.facebookUrl = facebookUrl || "";

@@ -4,10 +4,12 @@ import cors from "cors";
 import connectDB from "./utils/db.js";
 import authRoutes from "./routes/user.route.js";
 import quizRoute from "./routes/quiz.route.js";
+import studentQuizRoute from "./routes/studentquiz.route.js"; // ✅ NEW IMPORT
 import analyticsRoute from "./routes/analytics.route.js";
 import universitiesRoutes from "./routes/universities.route.js";
 import studentQuizRoute from "./routes/studentQuiz.route.js";
 import cookieParser from "cookie-parser";
+import universitiesRoutes from './routes/universities.js';
 
 // Load environment variables
 dotenv.config();
@@ -147,6 +149,9 @@ process.on('SIGTERM', () => {
       process.exit(0);
     });
   });
+});
+
+  console.log(`📚 Universities API: http://${HOST}:${PORT}/api/v1/universities`); // ✅ Added for debugging
 });
 
 export default app;
