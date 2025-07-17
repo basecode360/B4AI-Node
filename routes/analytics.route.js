@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import express from "express";
 import { authenticateToken } from "../middleware/authMiddleware.js";
 import PerformanceAnalytics from "../models/PerformanceAnalytics.js";
+import { userModel } from "../models/userModel.js";
 
 const router = express.Router();
 
@@ -373,9 +374,17 @@ router.get('/admin/summary', authenticateToken, async (req, res) => {
           totalCorrectQuestions: { $sum: "$totalCorrectQuestions" },
           avgAccuracy: { $avg: "$accuracyPercentage" },
           avgCumulativeScore: { $avg: "$cumulativeScore" },
-        }}]
-        const totalUsersWithAnalytics = await PerformanceAnalytics.countDocuments();
-    
+          totalTimedTime: { $sum: "$timeStats.TIMED" },
+          totalUntimedTime: { $sum: "$timeStats.UNTIMED" },
+          totalTutorTime: { $sum: "$timeStats.TUTOR" },
+          totalOnTheGoTime: { $sum: "$timeStats.ON-THE-GO" }
+        }
+      }
+    ];
+
+    // Run the summary pipeline and assign result to summary
+    const [summary] = await PerformanceAnalytics.aggregate(summaryPipeline);
+
     // Total quizzes taken across all users
     const totalQuizzesTaken = await PerformanceAnalytics.aggregate([
       { $group: { _id: null, total: { $sum: "$totalQuizzesTaken" } } }
@@ -749,6 +758,94 @@ router.delete('/admin/reset/:userId', authenticateToken, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to reset analytics',
+      error: error.message
+    });
+  }
+});
+
+// 📥 Admin: Export analytics data
+router.get('/admin/export', authenticateToken, async (req, res) => {
+  try {
+    console.log('📥 Export analytics request');
+    
+    // TODO: Add admin role check
+    
+    const format = req.query.format || 'json';
+    
+    // Get all analytics data with populated user info
+    const analytics = await PerformanceAnalytics.find({})
+      .populate('userId', 'email profile.firstName profile.lastName')
+      .lean();
+    
+    if (format === 'csv') {
+      // Convert to CSV format
+      const csvHeaders = [
+        'User Email',
+        'User Name',
+        'Total Quizzes',
+        'Questions Attempted',
+        'Correct Answers',
+        'Accuracy %',
+        'Cumulative Score',
+        'Time in TIMED',
+        'Time in UNTIMED',
+        'Time in TUTOR',
+        'Time in ON-THE-GO',
+        'Avg Time per Question',
+        'Last Updated'
+      ].join(',');
+      
+      const csvRows = analytics.map(a => [
+        a.userId?.email || '',
+        `${a.userId?.profile?.firstName || ''} ${a.userId?.profile?.lastName || ''}`.trim() || 'Unknown',
+        a.totalQuizzesTaken,
+        a.totalQuestionsAttempted,
+        a.totalCorrectQuestions,
+        a.accuracyPercentage,
+        a.cumulativeScore,
+        a.timeStats.TIMED,
+        a.timeStats.UNTIMED,
+        a.timeStats.TUTOR,
+        a.timeStats['ON-THE-GO'],
+        a.timePerQuestionStats.averageTime.toFixed(2),
+        new Date(a.lastUpdated).toISOString()
+      ].join(','));
+      
+      const csv = [csvHeaders, ...csvRows].join('\n');
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=analytics_export.csv');
+      return res.send(csv);
+    }
+    
+    // Default to JSON
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename=analytics_export.json');
+    return res.json({
+      success: true,
+      exportDate: new Date().toISOString(),
+      totalRecords: analytics.length,
+      data: analytics.map(a => ({
+        user: {
+          email: a.userId?.email || '',
+          name: `${a.userId?.profile?.firstName || ''} ${a.userId?.profile?.lastName || ''}`.trim() || 'Unknown'
+        },
+        totalQuizzesTaken: a.totalQuizzesTaken,
+        totalQuestionsAttempted: a.totalQuestionsAttempted,
+        totalCorrectQuestions: a.totalCorrectQuestions,
+        accuracyPercentage: a.accuracyPercentage,
+        cumulativeScore: a.cumulativeScore,
+        timeStats: a.timeStats,
+        timePerQuestionStats: a.timePerQuestionStats,
+        lastUpdated: a.lastUpdated
+      }))
+    });
+    
+  } catch (error) {
+    console.error('❌ Export error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to export analytics',
       error: error.message
     });
   }
