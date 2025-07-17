@@ -8,7 +8,6 @@ import studentQuizRoute from "./routes/studentquiz.route.js"; // ✅ NEW IMPORT
 import analyticsRoute from "./routes/analytics.route.js";
 import universitiesRoutes from "./routes/universities.route.js";
 import cookieParser from "cookie-parser";
-import universitiesRoutes from './routes/universities.js';
 
 // Load environment variables
 dotenv.config();

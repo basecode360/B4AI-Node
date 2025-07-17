@@ -165,7 +165,7 @@ const performanceAnalyticsSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
-}, {
+}, 
   timestamps: true
 });
 
@@ -262,7 +262,7 @@ performanceAnalyticsSchema.methods.updateAfterQuiz = async function(quizData) {
     this.difficultyPerformance[difficulty].attempted += totalQuestions;
     this.difficultyPerformance[difficulty].correct += correctAnswers;
   }
-  
+}
   await this.save();
 // ✅ FIXED: Updated static method with TIMED quiz count tracking
 performanceAnalyticsSchema.statics.updateWithLastQuiz = async function(userId, quizData) {
