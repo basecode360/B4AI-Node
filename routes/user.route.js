@@ -13,7 +13,9 @@ import {
   resetPassword,
 } from "../controllers/user.controller.js";
 import { singleUpload } from "../middleware/multer.js";
-import { userModel } from "../models/userModel.js"; // ✅ Using your existing model
+import { userModel } from "../models/userModel.js";
+import PerformanceAnalytics from "../models/PerformanceAnalytics.js"; // 🆕 Import for cleanup
+import { Quiz } from "../models/quizModel.js"; // 🆕 Import for cleanup
 import mongoose from "mongoose";
 
 const router = express.Router();
@@ -30,7 +32,184 @@ router.post("/forgot-password", forgotPassword);
 router.post("/verify-reset-code", verifyResetCode);
 router.post("/reset-password", resetPassword);
 
-// ✅ DATABASE INTEGRATED: USERS LIST ENDPOINT - Using your userModel
+// 🆕 DELETE ACCOUNT FUNCTIONALITY ===========================================
+
+// Get Account Deletion Info
+router.get("/deletion-info", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    console.log("🔍 GET DELETION INFO REQUEST for user:", userId);
+    
+    // Get user stats
+    const user = await userModel.findById(userId).select('email profile.firstName profile.lastName createdAt');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+    
+    // Get analytics data
+    const analytics = await PerformanceAnalytics.findOne({ userId });
+    
+    // Get quiz count
+    const quizCount = await Quiz.countDocuments({ userId });
+    
+    const deletionInfo = {
+      accountInfo: {
+        email: user.email,
+        name: `${user.profile?.firstName || ''} ${user.profile?.lastName || ''}`.trim() || user.email.split('@')[0],
+        memberSince: user.createdAt
+      },
+      dataToDelete: {
+        quizzesCreated: quizCount,
+        totalQuizzesTaken: analytics?.totalQuizzesTaken || 0,
+        totalQuestions: analytics?.totalQuestionsAttempted || 0,
+        bbPoints: analytics?.cumulativeScore || 0,
+        analyticsData: analytics ? true : false
+      }
+    };
+    
+    console.log("✅ Deletion info retrieved successfully");
+    
+    res.json({
+      success: true,
+      message: "Account deletion information retrieved",
+      info: deletionInfo
+    });
+    
+  } catch (error) {
+    console.error("❌ Get deletion info error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get deletion info",
+      error: error.message
+    });
+  }
+});
+
+// Delete Account
+router.delete("/delete-account", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { password, confirmationText } = req.body;
+    
+    console.log("🗑️ DELETE ACCOUNT REQUEST");
+    console.log("👤 User ID:", userId);
+    console.log("✅ Confirmation Text:", confirmationText);
+    
+    // Validation
+    if (!password || !password.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Password is required for account deletion"
+      });
+    }
+    
+    if (confirmationText !== "DELETE") {
+      return res.status(400).json({
+        success: false,
+        message: "Please type 'DELETE' to confirm account deletion"
+      });
+    }
+    
+    // Find user in database
+    const user = await userModel.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+    
+    // Verify password
+    const bcrypt = await import("bcryptjs");
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid password. Account deletion cancelled."
+      });
+    }
+    
+    // Prevent admin deletion (optional security measure)
+    if (user.role === 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: "Admin accounts cannot be deleted"
+      });
+    }
+    
+    console.log("🔐 Password verified. Starting account deletion process...");
+    
+    // Delete related data (analytics, quiz submissions, etc.)
+    let cleanupResults = {
+      analytics: 0,
+      quizzes: 0,
+      errors: []
+    };
+    
+    try {
+      // Delete user analytics
+      const analyticsResult = await PerformanceAnalytics.deleteMany({ userId: userId });
+      cleanupResults.analytics = analyticsResult.deletedCount;
+      console.log(`✅ Deleted ${analyticsResult.deletedCount} analytics records`);
+      
+      // Delete user quizzes created by this user
+      const quizzesResult = await Quiz.deleteMany({ userId: userId });
+      cleanupResults.quizzes = quizzesResult.deletedCount;
+      console.log(`✅ Deleted ${quizzesResult.deletedCount} user quizzes`);
+      
+      // Add more cleanup here if you have other related models
+      // Example: await StudentQuiz.deleteMany({ userId: userId });
+      
+    } catch (cleanupError) {
+      console.error("⚠️ Error during cleanup:", cleanupError);
+      cleanupResults.errors.push(cleanupError.message);
+      // Continue with user deletion even if cleanup fails partially
+    }
+    
+    // Delete user account
+    const deletedUser = await userModel.findByIdAndDelete(userId);
+    
+    if (!deletedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found during deletion"
+      });
+    }
+    
+    console.log("✅ Account deleted successfully");
+    console.log("📊 Cleanup Summary:", cleanupResults);
+    
+    res.json({
+      success: true,
+      message: "Your account has been permanently deleted. We're sorry to see you go!",
+      deletionSummary: {
+        accountDeleted: true,
+        analyticsRecordsDeleted: cleanupResults.analytics,
+        quizzesDeleted: cleanupResults.quizzes,
+        cleanupErrors: cleanupResults.errors.length > 0 ? cleanupResults.errors : null
+      }
+    });
+    
+  } catch (error) {
+    console.error("❌ Delete account error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete account. Please try again.",
+      error: error.message
+    });
+  }
+});
+
+// 🆕 END DELETE ACCOUNT FUNCTIONALITY =======================================
+
+// ✅ DATABASE INTEGRATED: USERS LIST ENDPOINT - Using your existing model
 router.get("/users", async (req, res) => {
   try {
     console.log("👥 Fetching users from MongoDB database...");
@@ -126,140 +305,6 @@ router.get("/stats", async (req, res) => {
     });
   }
 });
-
-// ✅ DATABASE INTEGRATED: DELETE USER ENDPOINT
-// router.delete("/users/:userId", authenticateToken, async (req, res) => {
-//   try {
-//     const { userId } = req.params;
-//     console.log("🗑️ Delete user request for ID:", userId);
-    
-//     // Check if user exists
-//     const userToDelete = await userModel.findById(userId);
-//     if (!userToDelete) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "User not found"
-//       });
-//     }
-    
-//     // Prevent deleting admin users (optional security measure)
-//     if (userToDelete.role === 'admin') {
-//       return res.status(403).json({
-//         success: false,
-//         message: "Cannot delete admin users"
-//       });
-//     }
-    
-//     // Delete user from database
-//     await userModel.findByIdAndDelete(userId);
-    
-//     console.log("✅ User deleted successfully from MongoDB:", userToDelete.email);
-    
-//     res.json({
-//       success: true,
-//       message: `User ${userToDelete.email} deleted successfully`,
-//       deletedUser: {
-//         _id: userToDelete._id,
-//         email: userToDelete.email
-//       }
-//     });
-    
-//   } catch (error) {
-//     console.error("❌ Delete user error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to delete user",
-//       error: error.message
-//     });
-//   }
-// });
-
-// ✅ DATABASE INTEGRATED: UPDATE USER ENDPOINT
-// router.put("/users/:userId", authenticateToken, async (req, res) => {
-//   try {
-//     const { userId } = req.params;
-//     const updateData = req.body;
-    
-//     console.log("✏️ Update user request for ID:", userId);
-//     console.log("📝 Update data:", updateData);
-    
-//     // Check if user exists
-//     const existingUser = await userModel.findById(userId);
-//     if (!existingUser) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "User not found"
-//       });
-//     }
-    
-//     // Prepare update object
-//     const updateFields = {
-//       updatedAt: new Date()
-//     };
-    
-//     // Handle email update
-//     if (updateData.email && updateData.email !== existingUser.email) {
-//       // Check if email already exists
-//       const emailExists = await userModel.findOne({ 
-//         email: updateData.email.toLowerCase(),
-//         _id: { $ne: userId } // Exclude current user
-//       });
-      
-//       if (emailExists) {
-//         return res.status(400).json({
-//           success: false,
-//           message: "Email already exists"
-//         });
-//       }
-      
-//       updateFields.email = updateData.email.toLowerCase();
-//     }
-    
-//     // Handle role update
-//     if (updateData.role) {
-//       updateFields.role = updateData.role;
-//     }
-    
-//     // Handle profile updates
-//     if (updateData.profile) {
-//       updateFields.profile = {
-//         ...existingUser.profile,
-//         ...updateData.profile
-//       };
-//     }
-    
-//     // Handle verification status
-//     if (updateData.isVerified !== undefined) {
-//       updateFields.isVerified = updateData.isVerified;
-//     }
-    
-//     // Update user in database
-//     const updatedUser = await userModel.findByIdAndUpdate(
-//       userId,
-//       { $set: updateFields },
-//       { 
-//         new: true, 
-//         runValidators: true 
-//       }
-//     ).select('-password -refreshToken -emailVerificationCode -passwordResetCode');
-    
-//     console.log("✅ User updated successfully in MongoDB:", updatedUser.email);
-    
-//     res.json({
-//       success: true,
-//       message: "User updated successfully",
-//       user: updatedUser
-//     });
-    
-//   } catch (error) {
-//     console.error("❌ Update user error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to update user",
-//       error: error.message
-//     });
-//   }
-// });
 
 // ✅ DELETE SPECIFIC USER ENDPOINT  ===================================================
 
