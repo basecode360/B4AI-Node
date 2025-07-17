@@ -5,6 +5,8 @@ import connectDB from "./utils/db.js";
 import authRoutes from "./routes/user.route.js";
 import quizRoute from "./routes/quiz.route.js";
 import analyticsRoute from "./routes/analytics.route.js";
+import universitiesRoutes from "./routes/universities.route.js";
+import studentQuizRoute from "./routes/studentQuiz.route.js";
 import cookieParser from "cookie-parser";
 
 // Load environment variables
@@ -95,7 +97,9 @@ app.get("/health", (req, res) => {
 // API routes
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/quiz", quizRoute);
+app.use("/api/v1/student-quiz", studentQuizRoute);
 app.use("/api/v1/analytics", analyticsRoute);
+app.use('/api/v1/universities', universitiesRoutes); 
 
 // 404 handler
 app.use((req, res) => {
