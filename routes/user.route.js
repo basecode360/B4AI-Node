@@ -15,6 +15,8 @@ import {
 import { singleUpload } from "../middleware/multer.js";
 import { userModel } from "../models/userModel.js"; // ✅ Using your existing model
 import mongoose from "mongoose";
+import bcrypt from "bcryptjs"; // Add this import
+import { sendEmail } from "../utils/emailService.js"; // Add this import
 
 const router = express.Router();
 
@@ -29,6 +31,170 @@ router.post("/resend-verification", resendVerificationCode);
 router.post("/forgot-password", forgotPassword);
 router.post("/verify-reset-code", verifyResetCode);
 router.post("/reset-password", resetPassword);
+
+// ✅ ADMIN CREATE USER ENDPOINT WITH EMAIL
+router.post("/admin/create-user", authenticateToken, async (req, res) => {
+  try {
+    // Check if the requester is an admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: "Only admins can create users"
+      });
+    }
+
+    const { email, password, role, profile, sendWelcomeEmail } = req.body;
+
+    console.log("👤 Admin creating new user:", email);
+
+    // Validate required fields
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required"
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await userModel.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: "User with this email already exists"
+      });
+    }
+
+    // Hash password
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Create new user
+    const newUser = new userModel({
+      email: email.toLowerCase(),
+      password: hashedPassword,
+      role: role || 'student',
+      isVerified: true, // Auto-verify users created by admin
+      profile: {
+        firstName: profile?.firstName || '',
+        lastName: profile?.lastName || '',
+        dateOfBirth: profile?.dateOfBirth || '',
+        gender: profile?.gender || 'not_specified',
+        institute: profile?.institute || '',
+        countryOfResidence: profile?.countryOfResidence || '',
+        educationStatus: profile?.educationStatus || 'student',
+        residence: profile?.residence || '',
+        dateOfGraduation: profile?.dateOfGraduation || '',
+        speciality: profile?.speciality || '',
+        facebookUrl: profile?.facebookUrl || '',
+        twitterUrl: profile?.twitterUrl || '',
+        instagramUrl: profile?.instagramUrl || '',
+        profilePic: profile?.profilePic || ''
+      },
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    await newUser.save();
+    console.log("✅ User created successfully:", newUser.email);
+
+    // Send welcome email if requested
+    if (sendWelcomeEmail && sendEmail) {
+      try {
+        const emailContent = {
+          to: email,
+          subject: 'Welcome to B4AI - Your Account Has Been Created',
+          html: `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background-color: #2563eb; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+                .content { background-color: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
+                .button { display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }
+                .credentials { background-color: #e5e7eb; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <h1>Welcome to B4AI!</h1>
+                </div>
+                <div class="content">
+                  <h2>Hello ${profile?.firstName || 'User'},</h2>
+                  
+                  <p>Your account has been successfully created by an administrator. You can now access the B4AI platform with the following credentials:</p>
+                  
+                  <div class="credentials">
+                    <p><strong>Email:</strong> ${email}</p>
+                    <p><strong>Password:</strong> ${password}</p>
+                    <p><strong>Role:</strong> ${role || 'student'}</p>
+                  </div>
+                  
+                  <p><strong>Important:</strong> Please change your password after your first login for security purposes.</p>
+                  
+                  <p>You can log in to your account using the button below:</p>
+                  
+                  <div style="text-align: center;">
+                    <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/login" class="button">Log In to Your Account</a>
+                  </div>
+                  
+                  <h3>What's Next?</h3>
+                  <ul>
+                    <li>Complete your profile information</li>
+                    <li>Explore available quizzes and learning materials</li>
+                    <li>Start your learning journey with B4AI</li>
+                  </ul>
+                  
+                  <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+                  
+                  <div class="footer">
+                    <p>Best regards,<br>The B4AI Team</p>
+                    <p style="color: #9ca3af; font-size: 12px;">This email was sent because an administrator created an account for you. If you believe this was done in error, please contact support.</p>
+                  </div>
+                </div>
+              </div>
+            </body>
+            </html>
+          `
+        };
+
+        await sendEmail(emailContent);
+        console.log("✉️ Welcome email sent to:", email);
+      } catch (emailError) {
+        console.error("❌ Failed to send welcome email:", emailError);
+        // Don't fail the user creation if email fails
+      }
+    }
+
+    // Remove sensitive data before sending response
+    const userResponse = {
+      _id: newUser._id,
+      email: newUser.email,
+      role: newUser.role,
+      profile: newUser.profile,
+      isVerified: newUser.isVerified,
+      createdAt: newUser.createdAt
+    };
+
+    // Return success response
+    res.status(201).json({
+      success: true,
+      message: "User created successfully" + (sendWelcomeEmail ? " and welcome email sent" : ""),
+      user: userResponse
+    });
+
+  } catch (error) {
+    console.error("❌ Error creating user:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to create user",
+      error: error.message
+    });
+  }
+});
 
 // ✅ DATABASE INTEGRATED: USERS LIST ENDPOINT - Using your userModel
 router.get("/users", async (req, res) => {
@@ -126,142 +292,6 @@ router.get("/stats", async (req, res) => {
     });
   }
 });
-
-// ✅ DATABASE INTEGRATED: DELETE USER ENDPOINT
-// router.delete("/users/:userId", authenticateToken, async (req, res) => {
-//   try {
-//     const { userId } = req.params;
-//     console.log("🗑️ Delete user request for ID:", userId);
-    
-//     // Check if user exists
-//     const userToDelete = await userModel.findById(userId);
-//     if (!userToDelete) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "User not found"
-//       });
-//     }
-    
-//     // Prevent deleting admin users (optional security measure)
-//     if (userToDelete.role === 'admin') {
-//       return res.status(403).json({
-//         success: false,
-//         message: "Cannot delete admin users"
-//       });
-//     }
-    
-//     // Delete user from database
-//     await userModel.findByIdAndDelete(userId);
-    
-//     console.log("✅ User deleted successfully from MongoDB:", userToDelete.email);
-    
-//     res.json({
-//       success: true,
-//       message: `User ${userToDelete.email} deleted successfully`,
-//       deletedUser: {
-//         _id: userToDelete._id,
-//         email: userToDelete.email
-//       }
-//     });
-    
-//   } catch (error) {
-//     console.error("❌ Delete user error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to delete user",
-//       error: error.message
-//     });
-//   }
-// });
-
-// ✅ DATABASE INTEGRATED: UPDATE USER ENDPOINT
-// router.put("/users/:userId", authenticateToken, async (req, res) => {
-//   try {
-//     const { userId } = req.params;
-//     const updateData = req.body;
-    
-//     console.log("✏️ Update user request for ID:", userId);
-//     console.log("📝 Update data:", updateData);
-    
-//     // Check if user exists
-//     const existingUser = await userModel.findById(userId);
-//     if (!existingUser) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "User not found"
-//       });
-//     }
-    
-//     // Prepare update object
-//     const updateFields = {
-//       updatedAt: new Date()
-//     };
-    
-//     // Handle email update
-//     if (updateData.email && updateData.email !== existingUser.email) {
-//       // Check if email already exists
-//       const emailExists = await userModel.findOne({ 
-//         email: updateData.email.toLowerCase(),
-//         _id: { $ne: userId } // Exclude current user
-//       });
-      
-//       if (emailExists) {
-//         return res.status(400).json({
-//           success: false,
-//           message: "Email already exists"
-//         });
-//       }
-      
-//       updateFields.email = updateData.email.toLowerCase();
-//     }
-    
-//     // Handle role update
-//     if (updateData.role) {
-//       updateFields.role = updateData.role;
-//     }
-    
-//     // Handle profile updates
-//     if (updateData.profile) {
-//       updateFields.profile = {
-//         ...existingUser.profile,
-//         ...updateData.profile
-//       };
-//     }
-    
-//     // Handle verification status
-//     if (updateData.isVerified !== undefined) {
-//       updateFields.isVerified = updateData.isVerified;
-//     }
-    
-//     // Update user in database
-//     const updatedUser = await userModel.findByIdAndUpdate(
-//       userId,
-//       { $set: updateFields },
-//       { 
-//         new: true, 
-//         runValidators: true 
-//       }
-//     ).select('-password -refreshToken -emailVerificationCode -passwordResetCode');
-    
-//     console.log("✅ User updated successfully in MongoDB:", updatedUser.email);
-    
-//     res.json({
-//       success: true,
-//       message: "User updated successfully",
-//       user: updatedUser
-//     });
-    
-//   } catch (error) {
-//     console.error("❌ Update user error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to update user",
-//       error: error.message
-//     });
-//   }
-// });
-
-// ✅ DELETE SPECIFIC USER ENDPOINT  ===================================================
 
 // ✅ DELETE USER BY EMAIL
 router.delete("/users/email/:email", authenticateToken, async (req, res) => {
@@ -492,9 +522,6 @@ router.put("/change-password", authenticateToken, async (req, res) => {
         message: "Current password and new password are required"
       });
     }
-    
-    // Use bcrypt import (same as your controller)
-    const bcrypt = await import("bcryptjs");
     
     // Find user using your userModel
     const user = await userModel.findById(req.user.userId);
