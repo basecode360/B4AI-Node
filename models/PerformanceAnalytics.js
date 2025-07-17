@@ -166,8 +166,8 @@ const performanceAnalyticsSchema = new mongoose.Schema({
     default: Date.now
   }
 }, 
-  timestamps: true
-});
+  
+},{timestamps: true});
 
 // Indexes for better query performance
 performanceAnalyticsSchema.index({ 'lastUpdated': -1 });
