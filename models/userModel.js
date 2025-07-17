@@ -52,7 +52,7 @@ const userSchema = new mongoose.Schema({
     // ✅ UPDATED: educationalStatus -> educationStatus
     educationStatus: {
       type: String,
-      default: "student",
+      // default: "student",
     },
     // ✅ UPDATED: address -> residence
     residence: {
@@ -63,7 +63,7 @@ const userSchema = new mongoose.Schema({
       type: String,
     },
     // ✅ UPDATED: specialty -> speciality
-    speciality: {
+    specialty: {
       type: String,
     },
     // ✅ Social media fields

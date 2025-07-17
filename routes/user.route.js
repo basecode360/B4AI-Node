@@ -65,8 +65,8 @@ router.get("/users", async (req, res) => {
         educationalStatus: user.profile?.educationStatus, // For frontend compatibility
         residence: user.profile?.residence,
         address: user.profile?.residence,        // For frontend compatibility
-        speciality: user.profile?.speciality,
-        specialty: user.profile?.speciality,     // For frontend compatibility
+        specialty: user.profile?.specialty,
+        specialty: user.profile?.specialty,     // For frontend compatibility
       },
       createdAt: user.createdAt,
       lastLogin: user.lastLogin,
@@ -438,8 +438,8 @@ router.put("/users/email/:email", authenticateToken, async (req, res) => {
       if (updateData.profile.residence !== undefined) mappedProfile.residence = updateData.profile.residence;
       if (updateData.profile.address !== undefined) mappedProfile.residence = updateData.profile.address; // Frontend compatibility
       
-      if (updateData.profile.speciality !== undefined) mappedProfile.speciality = updateData.profile.speciality;
-      if (updateData.profile.specialty !== undefined) mappedProfile.speciality = updateData.profile.specialty; // Frontend compatibility
+      if (updateData.profile.specialty !== undefined) mappedProfile.specialty = updateData.profile.specialty;
+      if (updateData.profile.specialty !== undefined) mappedProfile.specialty = updateData.profile.specialty; // Frontend compatibility
       
       // Social media fields
       if (updateData.profile.facebookUrl !== undefined) mappedProfile.facebookUrl = updateData.profile.facebookUrl;
