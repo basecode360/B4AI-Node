@@ -6,14 +6,34 @@ class SessionService {
    * Create a new session for a user
    */
   static async createSession(userId, userAgent = '', ipAddress = '') {
-    const sessionId = uuidv4();
     const sessionTTLDays = parseInt(process.env.SESSION_TTL_DAYS || '7');
     const expireAt = new Date(
       Date.now() + sessionTTLDays * 24 * 60 * 60 * 1000
     );
 
     try {
-      const session = await Session.create({
+      // Try to find an active session for this user and device
+      let session = await Session.findOne({
+        userId,
+        userAgent,
+        ipAddress,
+        expireAt: { $gt: new Date() },
+      });
+
+      if (session) {
+        // If found, update expiry and return
+        session.expireAt = expireAt;
+        session.lastAccessed = new Date();
+        await session.save();
+        console.log(
+          `🔄 Reusing active session for user ${userId}: ${session.sessionId} (new expiry: ${expireAt})`
+        );
+        return session;
+      }
+
+      // Otherwise, create a new session
+      const sessionId = uuidv4();
+      session = await Session.create({
         sessionId,
         userId,
         expireAt,
@@ -141,17 +161,56 @@ class SessionService {
 
     let platform = 'Unknown';
     let browser = 'Unknown';
+    let os = 'Unknown';
 
-    if (userAgent.includes('Mobile')) platform = 'Mobile';
-    else if (userAgent.includes('Tablet')) platform = 'Tablet';
-    else platform = 'Desktop';
+    if (/android/i.test(userAgent)) {
+      os = 'Android';
+    } else if (/iphone|ipad|ipod/i.test(userAgent)) {
+      os = 'iOS';
+    }
+
+    // Improved platform detection for mobile apps (Expo, React Native, etc.)
+    if (userAgent.includes('Mobile')) {
+      platform = 'Mobile';
+    } else if (userAgent.includes('Tablet')) {
+      platform = 'Tablet';
+    } else if (os === 'Android' || os === 'iOS') {
+      // If OS is Android/iOS but no Mobile/Tablet keyword, assume Mobile
+      platform = 'Mobile';
+    } else if (
+      userAgent.toLowerCase().includes('okhttp') ||
+      userAgent.toLowerCase().includes('expo')
+    ) {
+      // If userAgent contains okhttp or expo, assume Mobile
+      platform = 'Mobile';
+    } else {
+      platform = 'Desktop';
+    }
 
     if (userAgent.includes('Chrome')) browser = 'Chrome';
     else if (userAgent.includes('Firefox')) browser = 'Firefox';
     else if (userAgent.includes('Safari')) browser = 'Safari';
     else if (userAgent.includes('Edge')) browser = 'Edge';
+    else if (os === 'Android' || os === 'iOS') {
+      // If mobile OS but no browser detected, mark as NativeApp or Expo
+      if (
+        userAgent.toLowerCase().includes('expo') ||
+        userAgent.toLowerCase().includes('okhttp')
+      ) {
+        browser = 'Expo';
+      } else {
+        browser = 'NativeApp';
+      }
+    }
 
-    return { platform, browser, userAgent };
+    // Log if mobile and Android or iOS
+    if (platform === 'Mobile' && (os === 'Android' || os === 'iOS')) {
+      console.log(
+        `📱 Mobile session detected: OS=${os}, Browser=${browser}, UA=${userAgent}`
+      );
+    }
+
+    return { platform, browser, os, userAgent };
   }
 }
 
