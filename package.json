@@ -26,6 +26,7 @@
     "node-mailer": "^0.1.1",
     "nodemailer": "^7.0.5",
     "nodemon": "^3.1.10",
-    "papaparse": "^5.5.3"
+    "papaparse": "^5.5.3",
+    "uuid": "^11.1.0"
   }
 }
