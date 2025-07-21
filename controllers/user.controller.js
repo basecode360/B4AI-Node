@@ -142,7 +142,7 @@ const register = async (req, res) => {
       // ✅ Frontend: educationalStatus -> Backend: educationStatus
       educationStatus: educationalStatus || "student",
       // ✅ Frontend: specialty -> Backend: speciality
-      speciality: specialty || "",
+      specialty: specialty || "",
       // ✅ Gender mapping
       gender: gender || "not_specified",
       // ✅ Initialize social media fields
@@ -737,7 +737,8 @@ const updateProfile = async (req, res) => {
       residence,
       countryOfResidence,
       dateOfGraduation,
-      speciality,
+      specialty,        
+      educationStatus,  
       facebookUrl,
       twitterUrl,
       instagramUrl,
@@ -746,7 +747,7 @@ const updateProfile = async (req, res) => {
     const profilePic = req.file;
 
     console.log("🔍 Extracted fields:", {
-      firstName, lastName, dateOfBirth, gender, institute, residence, dateOfGraduation, speciality,countryOfResidence
+      firstName, lastName, dateOfBirth, gender, institute, residence, dateOfGraduation, specialty,countryOfResidence
     });
     console.log("🔍 Social Media URLs:", { facebookUrl, twitterUrl, instagramUrl });
     console.log("🔍 Profile Pic:", profilePic ? "Present" : "Not present");
@@ -833,7 +834,9 @@ const updateProfile = async (req, res) => {
     if (residence) updatedProfile.residence = residence;
     if (countryOfResidence) updatedProfile.countryOfResidence = countryOfResidence;
     if (dateOfGraduation) updatedProfile.dateOfGraduation = dateOfGraduation;
-    if (speciality) updatedProfile.speciality = speciality;
+    if (specialty) updatedProfile.specialty = specialty;
+    if (educationStatus) updatedProfile.educationStatus = educationStatus; 
+
 
     // Add social media URLs (even if empty, to allow clearing)
     updatedProfile.facebookUrl = facebookUrl || "";
