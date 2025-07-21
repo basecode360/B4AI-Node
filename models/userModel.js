@@ -45,24 +45,18 @@ const userSchema = new mongoose.Schema({
     institute: {
       type: String,
     },
-    // ✅ UPDATED: country -> countryOfResidence
     countryOfResidence: {
       type: String,
     },
-    // ✅ UPDATED: educationalStatus -> educationStatus
     educationStatus: {
       type: String,
-      // default: "student",
     },
-    // ✅ UPDATED: address -> residence
     residence: {
       type: String,
     },
-    // ✅ UPDATED: DOG -> dateOfGraduation
     dateOfGraduation: {
       type: String,
     },
-    // ✅ UPDATED: specialty -> speciality
     specialty: {
       type: String,
     },
