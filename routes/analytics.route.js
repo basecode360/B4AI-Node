@@ -31,7 +31,7 @@ router.post("/update-analytics", authenticateToken, async (req, res) => {
     }
 
     // Validate quiz mode
-    const validModes = ['TIMED', 'UNTIMED', 'TUTOR', 'ON-THE-GO'];
+    const validModes = ['TIMED', 'UNTIMED', 'ON-THE-GO'];
     if (!validModes.includes(quizMode)) {
       return res.status(400).json({
         success: false,
@@ -114,7 +114,6 @@ router.get("/user-stats", authenticateToken, async (req, res) => {
           timeStats: {
             TIMED: 0,
             UNTIMED: 0,
-            TUTOR: 0,
             'ON-THE-GO': 0
           },
           timePerQuestionStats: {
@@ -146,7 +145,11 @@ router.get("/user-stats", authenticateToken, async (req, res) => {
         totalCorrectQuestions: analytics.totalCorrectQuestions,
         accuracyPercentage: analytics.accuracyPercentage,
         cumulativeScore: analytics.cumulativeScore, // BB Points (sirf TIMED se)
-        timeStats: analytics.timeStats,
+        timeStats: {
+          TIMED: analytics.timeStats.TIMED || 0,
+          UNTIMED: analytics.timeStats.UNTIMED || 0,
+          'ON-THE-GO': analytics.timeStats['ON-THE-GO'] || 0
+        },
         timePerQuestionStats: analytics.timePerQuestionStats,
         lastQuiz: analytics.lastQuiz // Last quiz data
       }
@@ -225,7 +228,6 @@ router.get("/bb-points-summary", authenticateToken, async (req, res) => {
     // ✅ BETTER: Calculate timed quiz count from total time and average time
     const totalTime = analytics.timeStats.TIMED + 
                      analytics.timeStats.UNTIMED + 
-                     analytics.timeStats.TUTOR + 
                      analytics.timeStats['ON-THE-GO'];
     
     const timedRatio = totalTime > 0 ? analytics.timeStats.TIMED / totalTime : 0;
@@ -282,14 +284,17 @@ router.get("/verify-bb-points", authenticateToken, async (req, res) => {
 
     const totalTimeSpent = analytics.timeStats.TIMED + 
                           analytics.timeStats.UNTIMED + 
-                          analytics.timeStats.TUTOR + 
                           analytics.timeStats['ON-THE-GO'];
 
     const timedRatio = totalTimeSpent > 0 ? (analytics.timeStats.TIMED / totalTimeSpent) * 100 : 0;
 
     const verification = {
       cumulativeScore: analytics.cumulativeScore,
-      timeStats: analytics.timeStats,
+      timeStats: {
+        TIMED: analytics.timeStats.TIMED || 0,
+        UNTIMED: analytics.timeStats.UNTIMED || 0,
+        'ON-THE-GO': analytics.timeStats['ON-THE-GO'] || 0
+      },
       timedTimePercentage: timedRatio.toFixed(2) + '%',
       lastQuizMode: analytics.lastQuiz?.quizMode,
       lastQuizBBPoints: analytics.lastQuiz?.bbPointsEarned || 0,
@@ -385,7 +390,6 @@ router.get("/overview", authenticateToken, async (req, res) => {
     // Calculate additional metrics
     const totalTimeSpent = analytics.timeStats.TIMED + 
                           analytics.timeStats.UNTIMED + 
-                          analytics.timeStats.TUTOR + 
                           analytics.timeStats['ON-THE-GO'];
 
     const incorrectQuestions = analytics.totalQuestionsAttempted - analytics.totalCorrectQuestions;
@@ -401,7 +405,11 @@ router.get("/overview", authenticateToken, async (req, res) => {
       },
       timeBreakdown: {
         totalTimeSpent,
-        timeStats: analytics.timeStats,
+        timeStats: {
+          TIMED: analytics.timeStats.TIMED || 0,
+          UNTIMED: analytics.timeStats.UNTIMED || 0,
+          'ON-THE-GO': analytics.timeStats['ON-THE-GO'] || 0
+        },
         timePerQuestionStats: analytics.timePerQuestionStats
       },
       lastQuizInfo: analytics.lastQuiz,
@@ -458,7 +466,7 @@ router.get("/leaderboard", authenticateToken, async (req, res) => {
     const transformedLeaderboard = leaderboard.map((entry, index) => {
       // Calculate TIMED quiz ratio
       const totalTime = entry.timeStats.TIMED + entry.timeStats.UNTIMED + 
-                       entry.timeStats.TUTOR + entry.timeStats['ON-THE-GO'];
+                       entry.timeStats['ON-THE-GO'];
       const timedRatio = totalTime > 0 ? (entry.timeStats.TIMED / totalTime) * 100 : 0;
 
       return {

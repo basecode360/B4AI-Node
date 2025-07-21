@@ -50,10 +50,6 @@ const performanceAnalyticsSchema = new mongoose.Schema({
       type: Number,
       default: 0
     },
-    TUTOR: {
-      type: Number,
-      default: 0
-    },
     'ON-THE-GO': {
       type: Number,
       default: 0
@@ -273,13 +269,11 @@ performanceAnalyticsSchema.statics.updateWithLastQuiz = async function(userId, q
       quizCountByMode: {
         TIMED: quizMode === 'TIMED' ? 1 : 0,
         UNTIMED: quizMode === 'UNTIMED' ? 1 : 0,
-        TUTOR: quizMode === 'TUTOR' ? 1 : 0,
         'ON-THE-GO': quizMode === 'ON-THE-GO' ? 1 : 0
       },
       timeStats: {
         TIMED: quizMode === 'TIMED' ? timeSpent : 0,
         UNTIMED: quizMode === 'UNTIMED' ? timeSpent : 0,
-        TUTOR: quizMode === 'TUTOR' ? timeSpent : 0,
         'ON-THE-GO': quizMode === 'ON-THE-GO' ? timeSpent : 0
       },
       timePerQuestionStats: {
@@ -325,13 +319,11 @@ performanceAnalyticsSchema.statics.getUserAnalytics = async function(userId) {
       quizCountByMode: {
         TIMED: 0,
         UNTIMED: 0,
-        TUTOR: 0,
         'ON-THE-GO': 0
       },
       timeStats: {
         TIMED: 0,
         UNTIMED: 0,
-        TUTOR: 0,
         'ON-THE-GO': 0
       },
       timePerQuestionStats: {
@@ -358,7 +350,6 @@ performanceAnalyticsSchema.statics.getUserAnalytics = async function(userId) {
     quizCountByMode: analytics.quizCountByMode || {
       TIMED: 0,
       UNTIMED: 0,
-      TUTOR: 0,
       'ON-THE-GO': 0
     },
     timeStats: analytics.timeStats,
