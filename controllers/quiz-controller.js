@@ -1,4 +1,3 @@
-// FIXED BACKEND - WITH FORCE RANDOMIZATION
 
 import { Quiz } from "../models/quizModel.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -8,8 +7,6 @@ const forceRandomShuffle = (originalOptions, originalCorrectIndex) => {
   // Generate truly random index (0, 1, 2, 3)
   const newRandomIndex = Math.floor(Math.random() * 4);
 
-  console.log(`🎲 Original correct index: ${originalCorrectIndex}`);
-  console.log(`🎲 New random index: ${newRandomIndex}`);
 
   // Get the correct answer text
   const correctAnswerText = originalOptions[originalCorrectIndex];
@@ -24,11 +21,6 @@ const forceRandomShuffle = (originalOptions, originalCorrectIndex) => {
     shuffledOptions[originalCorrectIndex] = originalOptions[newRandomIndex];
   }
 
-  console.log("📋 Original options:", originalOptions);
-  console.log("🔀 Shuffled options:", shuffledOptions);
-  console.log(
-    `✅ Correct answer '${correctAnswerText}' moved to index: ${newRandomIndex}`
-  );
 
   return {
     shuffledOptions,
@@ -38,8 +30,6 @@ const forceRandomShuffle = (originalOptions, originalCorrectIndex) => {
 
 const generateOptionsWithGemini = async (question) => {
   try {
-    console.log("API Key exists:", !!process.env.GEMINI_API_KEY);
-    console.log("API Key length:", process.env.GEMINI_API_KEY?.length);
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -68,7 +58,6 @@ Remember: First option should always be correct!
     const response = await result.response;
     const text = response.text().trim();
 
-    console.log("Gemini Response:", text);
 
     // Parse simple format: correctAnswer|wrong1|wrong2|wrong3
     let cleanText = text;
@@ -91,15 +80,12 @@ Remember: First option should always be correct!
       }
     }
 
-    console.log("Cleaned line:", targetLine);
 
     const parts = targetLine.split("|");
     if (parts.length >= 4) {
       const originalOptions = parts.slice(0, 4).map((opt) => opt.trim());
       const originalCorrectIndex = 0; // AI always puts correct answer at index 0
 
-      console.log("✅ AI Response parsed successfully");
-      console.log("Original options from AI:", originalOptions);
 
       // ✅ FORCE BACKEND RANDOMIZATION
       const { shuffledOptions, newCorrectIndex } = forceRandomShuffle(
@@ -121,7 +107,6 @@ Remember: First option should always be correct!
     }
 
     // If parsing fails, return smart fallback with randomization
-    console.log("Parsing failed, using smart fallback with randomization");
     return getSmartFallbackWithRandomization(question);
   } catch (error) {
     console.error("Gemini Error:", error.message);
@@ -191,13 +176,9 @@ const addQuestion = async (req, res) => {
       });
     }
 
-    console.log("\n=== PROCESSING NEW QUESTION ===");
-    console.log("Question:", question);
 
     const aiResponse = await generateOptionsWithGemini(question);
 
-    console.log("Final AI Response (After Backend Randomization):", aiResponse);
-    console.log("=== END PROCESSING ===\n");
 
     // ✅ SCHEMA VALIDATION: Ensure correct answer index is within schema limits
     const validateCorrectAnswerIndex = (index) => {
@@ -205,14 +186,11 @@ const addQuestion = async (req, res) => {
       const SCHEMA_MAX_VALUE = 3; // ✅ Update this based on your schema
 
       if (index > SCHEMA_MAX_VALUE) {
-        console.log(
-          `⚠️ Index ${index} exceeds schema max ${SCHEMA_MAX_VALUE}, adjusting...`
-        );
+      
         return Math.min(index, SCHEMA_MAX_VALUE);
       }
 
       if (index < 0) {
-        console.log(`⚠️ Index ${index} is negative, adjusting to 0...`);
         return 0;
       }
 
@@ -319,7 +297,6 @@ const addCategory = async (req, res) => {
 
 // ✅ TESTING FUNCTION: Test randomization
 const testRandomDistribution = () => {
-  console.log("\n🧪 TESTING RANDOMIZATION DISTRIBUTION:");
   const testResults = [];
 
   for (let i = 0; i < 20; i++) {
@@ -328,15 +305,11 @@ const testRandomDistribution = () => {
     testResults.push(newCorrectIndex);
   }
 
-  console.log("Test results:", testResults);
 
   // Count distribution
   const distribution = { 0: 0, 1: 0, 2: 0, 3: 0 };
   testResults.forEach((index) => distribution[index]++);
 
-  console.log("Distribution count:", distribution);
-  console.log("Expected: roughly equal distribution");
-  console.log("✅ Randomization test completed\n");
 };
 
 const getQuestion = async (req, res) => {
