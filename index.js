@@ -4,10 +4,17 @@ import cors from "cors";
 import connectDB from "./utils/db.js";
 import authRoutes from "./routes/user.route.js";
 import quizRoute from "./routes/quiz.route.js";
-import studentQuizRoute from "./routes/studentquiz.route.js"; // ✅ NEW IMPORT
+import studentQuizRoute from "./routes/studentquiz.route.js";
 import analyticsRoute from "./routes/analytics.route.js";
 import universitiesRoutes from "./routes/universities.route.js";
+import questionsRoutes from "./routes/questions.route.js";
 import cookieParser from "cookie-parser";
+import mongoose from "mongoose";
+
+// ✅ EXISTING IMPORTS
+import countriesRoutes from './routes/countries.js';
+import educationalStatusRoutes from './routes/educationalStatus.js';
+import specialtiesRoutes from './routes/specialties.js';
 
 // Load environment variables
 dotenv.config();
@@ -23,6 +30,8 @@ const corsOption = {
       'exp://localhost:8081',
       'https://b4ai.netlify.app',
       'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:3002',
     ];
 
     // Check if the origin is in the allowed list
@@ -51,15 +60,37 @@ const corsOption = {
   optionsSuccessStatus: 200
 };
 
-// Middleware setup
+// ✅ FIXED MIDDLEWARE ORDER - CORS FIRST
 app.use(cors(corsOption));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// ✅ CONDITIONAL BODY PARSING - Skip JSON parsing for file uploads
+app.use((req, res, next) => {
+  // Skip JSON parsing for file upload routes
+  if (req.path.includes('/import-excel') || req.path.includes('/upload')) {
+    return next();
+  }
+  
+  // Apply JSON parsing for other routes
+  express.json({ limit: '50mb' })(req, res, next);
+});
+
+app.use((req, res, next) => {
+  // Skip URL encoded parsing for file upload routes
+  if (req.path.includes('/import-excel') || req.path.includes('/upload')) {
+    return next();
+  }
+  
+  // Apply URL encoded parsing for other routes
+  express.urlencoded({ extended: true, limit: '50mb' })(req, res, next);
+});
 
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  if (req.path.includes('/import-excel')) {
+    console.log('📁 File upload route detected - skipping JSON parsing');
+  }
   next();
 });
 
@@ -74,6 +105,7 @@ app.get("/", (req, res) => {
     endpoints: {
       auth: "/api/v1/auth",
       quiz: "/api/v1/quiz",
+      questions: "/api/v1/questions",
       analytics: "/api/v1/analytics"
     },
     port: PORT,
@@ -82,7 +114,8 @@ app.get("/", (req, res) => {
     availableRoutes: [
       "/api/v1/auth - Authentication routes",
       "/api/v1/quiz - Quiz management routes", 
-      "/api/v1/analytics - Analytics and performance routes" // 🆕 Added analytics info
+      "/api/v1/questions - Questions management and import routes",
+      "/api/v1/analytics - Analytics and performance routes"
     ]
   });
 });
@@ -99,51 +132,38 @@ app.get("/health", (req, res) => {
   });
 });
 
-// API routes
+// ✅ QUESTIONS ROUTE FIRST (before other routes to avoid conflicts)
+app.use("/api/v1/questions", questionsRoutes);
+
+// Other API routes
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/quiz", quizRoute);
 app.use("/api/v1/student-quiz", studentQuizRoute);
 app.use("/api/v1/analytics", analyticsRoute);
-app.use('/api/v1/universities', universitiesRoutes); 
+app.use('/api/v1/universities', universitiesRoutes);
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: "Route not found",
-    path: req.path
-  });
-});
+// ✅ EXISTING ROUTES
+app.use('/api/v1/countries', countriesRoutes);
+app.use('/api/v1/educational-status', educationalStatusRoutes);
+app.use('/api/v1/specialties', specialtiesRoutes);
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error("❌ Error:", err);
-  
-  if (err.message === 'Not allowed by CORS') {
-    return res.status(403).json({
-      success: false,
-      message: "CORS policy violation"
-    });
-  }
-  
-  res.status(err.status || 500).json({
-    success: false,
-    message: err.message || "Internal server error",
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-  });
-});
-
+// Route-specific logging middleware
 app.use("/api/v1/quiz", (req, res, next) => {
   console.log(`🧠 Quiz route accessed: ${req.method} ${req.path}`);
   next();
 }, quizRoute);
 
+app.use("/api/v1/questions", (req, res, next) => {
+  console.log(`❓ Questions route accessed: ${req.method} ${req.path}`);
+  next();
+}, questionsRoutes);
+
 app.use("/api/v1/analytics", (req, res, next) => {
   console.log(`📊 Analytics route accessed: ${req.method} ${req.path}`);
   next();
-}, analyticsRoute); // 🆕 Analytics route with logging
+}, analyticsRoute);
 
-// 🆕 API Documentation endpoint
+// ✅ UPDATED API Documentation endpoint
 app.get("/api", (req, res) => {
   res.json({
     message: "BoardBullets API Documentation",
@@ -176,6 +196,26 @@ app.get("/api", (req, res) => {
           "POST /student-submissions - Submit quiz for review"
         ]
       },
+      questions: {
+        base: "/api/v1/questions",
+        routes: [
+          "POST /import-excel - Import questions from Excel file (Admin)",
+          "GET /all - Get all questions with filters",
+          "GET /random - Get random questions for quiz",
+          "POST /create - Create single question (Admin)",
+          "PUT /update/:questionId - Update question (Admin)",
+          "DELETE /delete/:questionId - Delete question (Admin)",
+          "PUT /bulk-update - Bulk update questions (Admin)",
+          "DELETE /bulk-delete - Bulk delete questions (Admin)",
+          "GET /stats - Get questions statistics",
+          "GET /category/:category - Get questions by category",
+          "GET /categories - Get unique categories",
+          "GET /languages - Get available languages",
+          "GET /search - Search questions",
+          "PATCH /approve/:questionId - Approve/reject question (Admin)",
+          "GET /export - Export questions to Excel (Admin)"
+        ]
+      },
       analytics: {
         base: "/api/v1/analytics",
         routes: [
@@ -192,11 +232,36 @@ app.get("/api", (req, res) => {
   });
 });
 
-// 🆕 Enhanced error handling middleware
+// Enhanced error handling middleware
 app.use((err, req, res, next) => {
   console.error(`❌ Error occurred: ${err.message}`);
   console.error(`📍 Route: ${req.method} ${req.path}`);
   console.error(`🔍 Stack: ${err.stack}`);
+  
+  if (err.message === 'Not allowed by CORS') {
+    return res.status(403).json({
+      success: false,
+      message: "CORS policy violation"
+    });
+  }
+
+  // ✅ HANDLE JSON PARSING ERRORS
+  if (err.type === 'entity.parse.failed' || err.message.includes('Unexpected token')) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid JSON format or unsupported content type",
+      code: 'PARSE_ERROR'
+    });
+  }
+
+  // ✅ HANDLE FILE SIZE ERRORS
+  if (err.type === 'entity.too.large' || err.message.includes('request entity too large')) {
+    return res.status(413).json({
+      success: false,
+      message: "File too large. Maximum file size is 50MB.",
+      code: 'FILE_TOO_LARGE'
+    });
+  }
   
   if (err.name === 'ValidationError') {
     return res.status(400).json({
@@ -219,6 +284,21 @@ app.use((err, req, res, next) => {
       message: "Resource already exists"
     });
   }
+
+  // Handle multer errors (file upload)
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({
+      success: false,
+      message: "File size too large. Maximum size is 10MB."
+    });
+  }
+
+  if (err.message === 'Only Excel files (.xlsx) are allowed!') {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid file type. Only Excel files (.xlsx) are allowed."
+    });
+  }
   
   res.status(500).json({
     success: false,
@@ -227,7 +307,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 🆕 Handle 404 for unknown routes
+// Handle 404 for unknown routes
 app.use((req, res) => {
   console.log(`❌ 404 - Route not found: ${req.method} ${req.path}`);
   res.status(404).json({
@@ -237,6 +317,7 @@ app.use((req, res) => {
     availableRoutes: [
       "/api/v1/auth",
       "/api/v1/quiz", 
+      "/api/v1/questions",
       "/api/v1/analytics"
     ]
   });
@@ -248,7 +329,14 @@ app.listen(PORT, HOST, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`🚀 Server running on http://${HOST}:${PORT}`);
   console.log(`🌐 Network access: http://192.168.18.112:${PORT}`);
+  console.log(`📚 Universities API: http://${HOST}:${PORT}/api/v1/universities`);
+  console.log(`🌍 Countries API: http://${HOST}:${PORT}/api/v1/countries`);
+  console.log(`🎓 Educational Status API: http://${HOST}:${PORT}/api/v1/educational-status`);
+  console.log(`⚕️ Specialties API: http://${HOST}:${PORT}/api/v1/specialties`);
   console.log(`📊 Analytics API: http://${HOST}:${PORT}/api/v1/analytics`);
+  console.log(`❓ Questions API: http://${HOST}:${PORT}/api/v1/questions`);
+  console.log(`📁 File upload limit: 50MB`);
+  console.log(`✅ Conditional body parsing enabled for file uploads`);
 });
 
 // Graceful shutdown
@@ -262,6 +350,5 @@ process.on('SIGTERM', () => {
     });
   });
 });
-
 
 export default app;
