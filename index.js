@@ -51,7 +51,7 @@ const corsOption = {
     }
   },
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"], // ✅ ADDED PATCH HERE
   allowedHeaders: [
     "Content-Type", 
     "Authorization", 

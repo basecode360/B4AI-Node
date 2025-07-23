@@ -510,10 +510,17 @@ export const getAllQuestions = async (req, res) => {
 
     // Get questions with pagination
     const questions = await Questions.find(filter)
-      .populate('creator', 'name email role')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
+    .populate({
+      path: 'creator',
+      select: 'name email role',
+      populate: {
+        path: 'profile',
+        select: 'firstName lastName profilePic'
+      }
+    })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(parseInt(limit));
 
     // Get total count
     const total = await Questions.countDocuments(filter);
