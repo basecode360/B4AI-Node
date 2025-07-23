@@ -74,6 +74,23 @@ const userSchema = new mongoose.Schema({
       default: "",
     },
   },
+  hasPaid: {
+    type: Boolean,
+    default: false,
+  },
+  // Existing schema mein yeh add karo
+subscriptionDetails: {
+  planType: {
+    type: String,
+    enum: ["monthly", "quarterly"],
+  },
+  period: String,
+  amount: Number,
+  currency: String,
+  paymentDate: Date,
+  stripeSessionId: String,
+  expiryDate: Date,
+},
   // ✅ Added timestamps
   createdAt: {
     type: Date,

@@ -15,6 +15,11 @@ import mongoose from "mongoose";
 import countriesRoutes from './routes/countries.js';
 import educationalStatusRoutes from './routes/educationalStatus.js';
 import specialtiesRoutes from './routes/specialties.js';
+// ✅ NEW: Separate Categories and Subcategories routes
+import categoriesRoutes from './routes/categories.route.js';
+import subcategoryRoutes from './routes/subcategory.route.js';
+
+import stripeRoutes from "./routes/stripe.js";
 
 // Load environment variables
 dotenv.config();
@@ -48,7 +53,7 @@ const corsOption = {
     }
   },
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"], // ✅ ADDED PATCH HERE
   allowedHeaders: [
     "Content-Type", 
     "Authorization", 
@@ -63,6 +68,9 @@ const corsOption = {
 // ✅ FIXED MIDDLEWARE ORDER - CORS FIRST
 app.use(cors(corsOption));
 app.use(cookieParser());
+
+
+app.use('/api/v1/stripe/webhook', express.raw({ type: 'application/json' }));
 
 // ✅ CONDITIONAL BODY PARSING - Skip JSON parsing for file uploads
 app.use((req, res, next) => {
@@ -106,7 +114,9 @@ app.get("/", (req, res) => {
       auth: "/api/v1/auth",
       quiz: "/api/v1/quiz",
       questions: "/api/v1/questions",
-      analytics: "/api/v1/analytics"
+      analytics: "/api/v1/analytics",
+      categories: "/api/v1/categories", // ✅ NEW
+      subcategories: "/api/v1/subcategories" // ✅ NEW
     },
     port: PORT,
     host: HOST,
@@ -115,7 +125,9 @@ app.get("/", (req, res) => {
       "/api/v1/auth - Authentication routes",
       "/api/v1/quiz - Quiz management routes", 
       "/api/v1/questions - Questions management and import routes",
-      "/api/v1/analytics - Analytics and performance routes"
+      "/api/v1/analytics - Analytics and performance routes",
+      "/api/v1/categories - Categories management routes", // ✅ NEW
+      "/api/v1/subcategories - Subcategories management routes" // ✅ NEW
     ]
   });
 });
@@ -134,6 +146,7 @@ app.get("/health", (req, res) => {
 
 // ✅ QUESTIONS ROUTE FIRST (before other routes to avoid conflicts)
 app.use("/api/v1/questions", questionsRoutes);
+app.use("/api/v1/stripe", stripeRoutes);
 
 // Other API routes
 app.use("/api/v1/auth", authRoutes);
@@ -146,6 +159,10 @@ app.use('/api/v1/universities', universitiesRoutes);
 app.use('/api/v1/countries', countriesRoutes);
 app.use('/api/v1/educational-status', educationalStatusRoutes);
 app.use('/api/v1/specialties', specialtiesRoutes);
+
+// ✅ NEW: Separate Categories and Subcategories routes
+app.use('/api/v1/categories', categoriesRoutes);
+app.use('/api/v1/subcategories', subcategoryRoutes);
 
 // Route-specific logging middleware
 app.use("/api/v1/quiz", (req, res, next) => {
@@ -162,6 +179,17 @@ app.use("/api/v1/analytics", (req, res, next) => {
   console.log(`📊 Analytics route accessed: ${req.method} ${req.path}`);
   next();
 }, analyticsRoute);
+
+// ✅ NEW: Separate logging middleware for categories and subcategories
+app.use("/api/v1/categories", (req, res, next) => {
+  console.log(`📂 Categories route accessed: ${req.method} ${req.path}`);
+  next();
+}, categoriesRoutes);
+
+app.use("/api/v1/subcategories", (req, res, next) => {
+  console.log(`📁 Subcategories route accessed: ${req.method} ${req.path}`);
+  next();
+}, subcategoryRoutes);
 
 // ✅ UPDATED API Documentation endpoint
 app.get("/api", (req, res) => {
@@ -226,6 +254,31 @@ app.get("/api", (req, res) => {
           "GET /overview - Get complete analytics overview",
           "GET /leaderboard - Get leaderboard data",
           "DELETE /reset-analytics - Reset user analytics (testing)"
+        ]
+      },
+      // ✅ NEW: Separate Categories documentation
+      categories: {
+        base: "/api/v1/categories",
+        routes: [
+          "GET / - Get all categories",
+          "GET /:id - Get category by ID",
+          "POST / - Create new category (Admin)",
+          "PUT /:id - Update category (Admin)",
+          "DELETE /:id - Delete category (Admin)",
+          "GET /stats/count - Get categories with question count"
+        ]
+      },
+      // ✅ NEW: Separate Subcategories documentation
+      subcategories: {
+        base: "/api/v1/subcategories",
+        routes: [
+          "GET / - Get all subcategories",
+          "GET /:id - Get subcategory by ID",
+          "POST / - Create new subcategory (Admin)",
+          "PUT /:id - Update subcategory (Admin)",
+          "DELETE /:id - Delete subcategory (Admin)",
+          "GET /stats/count - Get subcategories with question count",
+          "GET /search/:searchTerm - Search subcategories by name"
         ]
       }
     }
@@ -318,7 +371,9 @@ app.use((req, res) => {
       "/api/v1/auth",
       "/api/v1/quiz", 
       "/api/v1/questions",
-      "/api/v1/analytics"
+      "/api/v1/analytics",
+      "/api/v1/categories", // ✅ NEW
+      "/api/v1/subcategories" // ✅ NEW
     ]
   });
 });
@@ -335,6 +390,9 @@ app.listen(PORT, HOST, () => {
   console.log(`⚕️ Specialties API: http://${HOST}:${PORT}/api/v1/specialties`);
   console.log(`📊 Analytics API: http://${HOST}:${PORT}/api/v1/analytics`);
   console.log(`❓ Questions API: http://${HOST}:${PORT}/api/v1/questions`);
+  // ✅ NEW: Separate Categories and Subcategories API logs
+  console.log(`📂 Categories API: http://${HOST}:${PORT}/api/v1/categories`);
+  console.log(`📁 Subcategories API: http://${HOST}:${PORT}/api/v1/subcategories`);
   console.log(`📁 File upload limit: 50MB`);
   console.log(`✅ Conditional body parsing enabled for file uploads`);
 });
