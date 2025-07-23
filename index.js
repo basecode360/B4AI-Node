@@ -93,12 +93,29 @@ app.use((req, res, next) => {
   express.urlencoded({ extended: true, limit: '50mb' })(req, res, next);
 });
 
-// Request logging middleware
+// ✅ Enhanced Request logging middleware with language detection
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  
+  // ✅ Log language parameter if present
+  if (req.query.language) {
+    console.log(`🌐 Language filter detected: ${req.query.language}`);
+  }
+  
   if (req.path.includes('/import-excel')) {
     console.log('📁 File upload route detected - skipping JSON parsing');
   }
+  
+  // ✅ Log quiz-related requests with more detail
+  if (req.path.includes('/quiz/')) {
+    console.log('🧠 Quiz API request:', {
+      method: req.method,
+      path: req.path,
+      query: req.query,
+      language: req.query.language || 'not specified'
+    });
+  }
+  
   next();
 });
 
@@ -123,12 +140,21 @@ app.get("/", (req, res) => {
     timestamp: new Date().toISOString(),
     availableRoutes: [
       "/api/v1/auth - Authentication routes",
-      "/api/v1/quiz - Quiz management routes", 
+      "/api/v1/quiz - Quiz management routes with language support", 
       "/api/v1/questions - Questions management and import routes",
-      "/api/v1/analytics - Analytics and performance routes",
-      "/api/v1/categories - Categories management routes", // ✅ NEW
-      "/api/v1/subcategories - Subcategories management routes" // ✅ NEW
-    ]
+      "/api/v1/analytics - Analytics and performance routes"
+    ],
+    // ✅ New language support info
+    languageSupport: {
+      enabled: true,
+      defaultLanguage: "english",
+      supportedLanguages: ["english", "spanish", "french"],
+      usage: {
+        categories: "/api/v1/quiz/categories?language=spanish",
+        questions: "/api/v1/quiz/questions?language=french&category=Biology",
+        languages: "/api/v1/quiz/languages"
+      }
+    }
   });
 });
 
@@ -141,6 +167,13 @@ app.get("/health", (req, res) => {
     port: PORT,
     host: HOST,
     uptime: process.uptime(),
+    // ✅ Add language support status
+    features: {
+      languageFiltering: "enabled",
+      defaultLanguage: "english",
+      corsEnabled: true,
+      fileUploadEnabled: true
+    }
   });
 });
 
@@ -148,7 +181,7 @@ app.get("/health", (req, res) => {
 app.use("/api/v1/questions", questionsRoutes);
 app.use("/api/v1/stripe", stripeRoutes);
 
-// Other API routes
+// ✅ Other API routes with enhanced logging
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/quiz", quizRoute);
 app.use("/api/v1/student-quiz", studentQuizRoute);
@@ -160,13 +193,12 @@ app.use('/api/v1/countries', countriesRoutes);
 app.use('/api/v1/educational-status', educationalStatusRoutes);
 app.use('/api/v1/specialties', specialtiesRoutes);
 
-// ✅ NEW: Separate Categories and Subcategories routes
-app.use('/api/v1/categories', categoriesRoutes);
-app.use('/api/v1/subcategories', subcategoryRoutes);
-
-// Route-specific logging middleware
+// ✅ Route-specific logging middleware with language awareness
 app.use("/api/v1/quiz", (req, res, next) => {
   console.log(`🧠 Quiz route accessed: ${req.method} ${req.path}`);
+  if (req.query.language) {
+    console.log(`🌐 Language filter: ${req.query.language}`);
+  }
   next();
 }, quizRoute);
 
@@ -180,22 +212,16 @@ app.use("/api/v1/analytics", (req, res, next) => {
   next();
 }, analyticsRoute);
 
-// ✅ NEW: Separate logging middleware for categories and subcategories
-app.use("/api/v1/categories", (req, res, next) => {
-  console.log(`📂 Categories route accessed: ${req.method} ${req.path}`);
-  next();
-}, categoriesRoutes);
-
-app.use("/api/v1/subcategories", (req, res, next) => {
-  console.log(`📁 Subcategories route accessed: ${req.method} ${req.path}`);
-  next();
-}, subcategoryRoutes);
-
-// ✅ UPDATED API Documentation endpoint
+// ✅ UPDATED API Documentation endpoint with language support
 app.get("/api", (req, res) => {
   res.json({
     message: "BoardBullets API Documentation",
     version: "1.0.0",
+    languageSupport: {
+      enabled: true,
+      defaultLanguage: "english",
+      supportedLanguages: ["english", "spanish", "french", "urdu", "arabic"]
+    },
     endpoints: {
       auth: {
         base: "/api/v1/auth",
@@ -213,15 +239,19 @@ app.get("/api", (req, res) => {
       quiz: {
         base: "/api/v1/quiz",
         routes: [
-          "GET /get-question - Get quiz questions",
+          "GET /categories - Get quiz categories (supports ?language=spanish)",
+          "GET /questions - Get quiz questions (supports ?language=french&category=Biology)",
+          "GET /languages - Get available languages",
+          "GET /subcategories/:category - Get subcategories (supports ?language=urdu)",
+          "GET /stats - Get quiz statistics with language breakdown",
           "POST /add-question - Add new question",
           "PUT /add-category/:questionId - Add category to question",
-          "GET /manage-quizzes - Admin: Get all quizzes",
-          "POST /manage-quizzes - Admin: Create new quiz",
-          "PUT /manage-quizzes/:quizId - Admin: Update quiz",
-          "DELETE /manage-quizzes/:quizId - Admin: Delete quiz",
-          "GET /student-submissions - Admin: Get student submissions",
-          "POST /student-submissions - Submit quiz for review"
+          "GET /get-question - Get quiz questions (legacy)"
+        ],
+        languageExamples: [
+          "GET /api/v1/quiz/categories?language=spanish",
+          "GET /api/v1/quiz/questions?language=french&category=Biology&difficulty=medium",
+          "GET /api/v1/quiz/subcategories/Biology?language=urdu"
         ]
       },
       questions: {
@@ -285,10 +315,16 @@ app.get("/api", (req, res) => {
   });
 });
 
-// Enhanced error handling middleware
+// ✅ Enhanced error handling middleware with language-aware logging
 app.use((err, req, res, next) => {
   console.error(`❌ Error occurred: ${err.message}`);
   console.error(`📍 Route: ${req.method} ${req.path}`);
+  
+  // ✅ Log language context if available
+  if (req.query.language) {
+    console.error(`🌐 Language context: ${req.query.language}`);
+  }
+  
   console.error(`🔍 Stack: ${err.stack}`);
   
   if (err.message === 'Not allowed by CORS') {
@@ -360,9 +396,15 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Handle 404 for unknown routes
+// ✅ Enhanced 404 handler with language support info
 app.use((req, res) => {
   console.log(`❌ 404 - Route not found: ${req.method} ${req.path}`);
+  
+  // ✅ Check if it's a language-related query
+  if (req.query.language) {
+    console.log(`🌐 Language parameter was: ${req.query.language}`);
+  }
+  
   res.status(404).json({
     success: false,
     message: "Route not found",
@@ -371,19 +413,26 @@ app.use((req, res) => {
       "/api/v1/auth",
       "/api/v1/quiz", 
       "/api/v1/questions",
-      "/api/v1/analytics",
-      "/api/v1/categories", // ✅ NEW
-      "/api/v1/subcategories" // ✅ NEW
-    ]
+      "/api/v1/analytics"
+    ],
+    // ✅ Add language support info for 404s
+    languageSupport: {
+      enabled: true,
+      examples: [
+        "/api/v1/quiz/categories?language=spanish",
+        "/api/v1/quiz/questions?language=french&category=Biology"
+      ]
+    }
   });
 });
 
-// Start server with enhanced logging
+// ✅ Enhanced server startup with language support info
 app.listen(PORT, HOST, () => {
   connectDB();
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`🚀 Server running on http://${HOST}:${PORT}`);
   console.log(`🌐 Network access: http://192.168.18.112:${PORT}`);
+  console.log(`🧠 Quiz API with language support: http://${HOST}:${PORT}/api/v1/quiz`);
   console.log(`📚 Universities API: http://${HOST}:${PORT}/api/v1/universities`);
   console.log(`🌍 Countries API: http://${HOST}:${PORT}/api/v1/countries`);
   console.log(`🎓 Educational Status API: http://${HOST}:${PORT}/api/v1/educational-status`);
@@ -395,6 +444,8 @@ app.listen(PORT, HOST, () => {
   console.log(`📁 Subcategories API: http://${HOST}:${PORT}/api/v1/subcategories`);
   console.log(`📁 File upload limit: 50MB`);
   console.log(`✅ Conditional body parsing enabled for file uploads`);
+  console.log(`🌐 Language filtering enabled for quiz endpoints`);
+  console.log(`🔗 Example: http://${HOST}:${PORT}/api/v1/quiz/categories?language=spanish`);
 });
 
 // Graceful shutdown
