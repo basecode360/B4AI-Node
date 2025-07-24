@@ -204,6 +204,7 @@ app.get("/api", (req, res) => {
           "POST /reset-password - Reset password"
         ]
       },
+      // Test
       quiz: {
         base: "/api/v1/quiz",
         routes: [
