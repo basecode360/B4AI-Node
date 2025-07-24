@@ -263,8 +263,6 @@ app.get('/api', (req, res) => {
           'POST /add-question - Add new question',
           'PUT /add-category/:questionId - Add category to question',
           'GET /get-question - Get quiz questions (legacy)',
-          'POST /add-question - Add new question',
-          'PUT /add-category/:questionId - Add category to question',
           'GET /manage-quizzes - Admin: Get all quizzes',
           'POST /manage-quizzes - Admin: Create new quiz',
           'PUT /manage-quizzes/:quizId - Admin: Update quiz',

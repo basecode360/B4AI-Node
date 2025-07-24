@@ -30,32 +30,32 @@ const quizSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
-  // ✅ FIXED: Single language field
   language: {
     type: String,
     enum: ['english', 'french', 'spanish', 'german', 'urdu', 'arabic'],
     default: 'english',
     required: true,
   },
-  // ✅ FIXED: Difficulty level
   difficulty: {
     type: String,
     enum: ['easy', 'medium', 'hard'],
     default: 'medium',
   },
-  // ✅ Status for admin quizzes
   status: {
     type: String,
     enum: ['active', 'inactive', 'archived'],
     default: 'active',
   },
-  // ✅ Exam type support
   examType: {
     type: String,
     enum: ['MCAT', 'USMLE', 'NEET', 'General', 'Custom'],
     default: 'General',
   },
-  // ✅ Usage statistics
+  tags: [
+    {
+      type: String,
+    },
+  ],
   usageCount: {
     type: Number,
     default: 0,
@@ -66,7 +66,6 @@ const quizSchema = new mongoose.Schema({
     max: 100,
     default: null,
   },
-  // ✅ Question metadata
   approved: {
     type: Boolean,
     default: true,
@@ -101,20 +100,21 @@ const quizSchema = new mongoose.Schema({
   },
 });
 
-// ✅ IMPROVED: Better indexes for filtering
+// ✅ Indexes
 quizSchema.index({ category: 1, subCategory: 1, language: 1, difficulty: 1 });
 quizSchema.index({ status: 1, approved: 1 });
 quizSchema.index({ language: 1, difficulty: 1 });
 quizSchema.index({ category: 1, language: 1 });
+quizSchema.index({ userId: 1, status: 1 });
 quizSchema.index({ createdAt: -1 });
 
-// Update timestamp on save
+// ✅ Update timestamp
 quizSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });
 
-// ✅ IMPROVED: Static methods for better filtering
+// ✅ Get filtered questions
 quizSchema.statics.getFilteredQuestions = async function (filters = {}) {
   const {
     category,
@@ -127,9 +127,7 @@ quizSchema.statics.getFilteredQuestions = async function (filters = {}) {
     status = 'active',
   } = filters;
 
-  // Build filter object
   const filter = { status, approved: true };
-
   if (language) filter.language = language;
   if (category) filter.category = new RegExp(category, 'i');
   if (subCategory) filter.subCategory = new RegExp(subCategory, 'i');
@@ -138,16 +136,15 @@ quizSchema.statics.getFilteredQuestions = async function (filters = {}) {
 
   let query = this.find(filter)
     .select(
-      'question options correctAnswer category subCategory language difficulty examType'
+      'question options correctAnswer category subCategory language difficulty examType tags'
     )
     .lean();
 
-  // Random sampling
   if (random) {
     const count = await this.countDocuments(filter);
     if (count > limit) {
-      const randomSkip = Math.floor(Math.random() * Math.max(0, count - limit));
-      query = query.skip(randomSkip);
+      const skip = Math.floor(Math.random() * Math.max(0, count - limit));
+      query = query.skip(skip);
     }
   }
 
@@ -196,9 +193,7 @@ quizSchema.statics.getCategoriesWithCounts = async function () {
         _id: 0,
       },
     },
-    {
-      $sort: { count: -1 },
-    },
+    { $sort: { count: -1 } },
   ]);
 };
 
@@ -212,7 +207,20 @@ quizSchema.statics.getAvailableDifficulties = async function () {
   return this.distinct('difficulty', { status: 'active', approved: true });
 };
 
-// Static method for bulk operations
+// ✅ Category-language stats
+quizSchema.statics.getCategoryStats = async function () {
+  return this.aggregate([
+    {
+      $group: {
+        _id: { category: '$category', language: '$language' },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { count: -1 } },
+  ]);
+};
+
+// ✅ Bulk update category/subCategory
 quizSchema.statics.bulkUpdateCategory = async function (
   quizIds,
   category,
@@ -222,12 +230,30 @@ quizSchema.statics.bulkUpdateCategory = async function (
     { _id: { $in: quizIds } },
     {
       $set: {
-        category: category,
-        subCategory: subCategory,
+        category,
+        subCategory,
         updatedAt: new Date(),
       },
     }
   );
+};
+
+// ✅ Bulk update status
+quizSchema.statics.bulkUpdateStatus = async function (quizIds, status) {
+  return this.updateMany(
+    { _id: { $in: quizIds } },
+    {
+      $set: {
+        status,
+        updatedAt: new Date(),
+      },
+    }
+  );
+};
+
+// ✅ Bulk delete quizzes
+quizSchema.statics.bulkDelete = async function (quizIds) {
+  return this.deleteMany({ _id: { $in: quizIds } });
 };
 
 export const Quiz = mongoose.models.Quiz || mongoose.model('Quiz', quizSchema);

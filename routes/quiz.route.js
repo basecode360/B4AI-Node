@@ -821,36 +821,95 @@ router.get('/manage-quizzes/:quizId', authenticateToken, async (req, res) => {
 // GET ALL STUDENT SUBMISSIONS (Admin View)
 router.get('/student-submissions', authenticateToken, async (req, res) => {
   try {
-    console.log('🔍 Fetching all student quiz submissions...');
+    const { status, category, language, page = 1, limit = 20 } = req.query;
 
-    // ✅ Admins can access all submissions, no user filtering
-    const submissions = await StudentQuiz.find({})
-      .populate('quizId', 'title') // Populate quiz title
-      .populate('userId', 'name email') // Populate user details
-      .lean();
+    console.log('📋 Fetching student quiz submissions...');
+    console.log('🔍 Filters:', { status, category, language });
 
-    console.log(`✅ Found ${submissions.length} submissions`);
+    // Build filter query
+    const filter = {};
+    if (status && status !== 'all') filter.status = status;
+    if (category && category !== 'all') filter.category = category;
+    if (language && language !== 'all') filter.language = language;
+
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Fetch submissions with pagination
+    const submissions = await StudentQuiz.find(filter)
+      .populate('userId', 'email profile.firstName profile.lastName role')
+      .populate('moderatedBy', 'email profile.firstName profile.lastName')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    // Get total count for pagination
+    const totalCount = await StudentQuiz.countDocuments(filter);
+
+    console.log(
+      `📊 Found ${submissions.length} submissions (${totalCount} total)`
+    );
+
+    // Transform data
+    const transformedSubmissions = submissions.map((submission) => ({
+      _id: submission._id,
+      question: submission.question,
+      options: submission.options,
+      correctAnswer: submission.correctAnswer,
+      category: submission.category,
+      subCategory: submission.subCategory,
+      language: submission.language,
+      difficulty: submission.difficulty,
+      status: submission.status,
+      moderationNotes: submission.moderationNotes,
+      submissionSource: submission.submissionSource,
+      qualityScore: submission.qualityScore,
+      reportCount: submission.reportCount,
+      viewCount: submission.viewCount,
+      tags: submission.tags,
+      createdAt: submission.createdAt,
+      updatedAt: submission.updatedAt,
+      moderatedAt: submission.moderatedAt,
+      submitter: submission.userId
+        ? {
+            _id: submission.userId._id,
+            email: submission.userId.email,
+            name:
+              `${submission.userId.profile?.firstName || ''} ${
+                submission.userId.profile?.lastName || ''
+              }`.trim() || submission.userId.email.split('@')[0],
+            role: submission.userId.role,
+          }
+        : null,
+      moderator: submission.moderatedBy
+        ? {
+            _id: submission.moderatedBy._id,
+            email: submission.moderatedBy.email,
+            name:
+              `${submission.moderatedBy.profile?.firstName || ''} ${
+                submission.moderatedBy.profile?.lastName || ''
+              }`.trim() || submission.moderatedBy.email.split('@')[0],
+          }
+        : null,
+    }));
 
     res.json({
       success: true,
       message: 'Student submissions fetched successfully',
-      data: submissions,
-      total: submissions.length,
-      metadata: {
-        timestamp: new Date().toISOString(),
-        totalQuizzes: submissions.reduce(
-          (sum, sub) => sum + (sub.questions ? sub.questions.length : 0),
-          0
-        ),
+      submissions: transformedSubmissions,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalCount / parseInt(limit)),
+        totalItems: totalCount,
+        itemsPerPage: parseInt(limit),
       },
     });
   } catch (error) {
-    console.error('❌ Get submissions error:', error);
+    console.error('❌ Fetch student submissions error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch submissions',
+      message: 'Failed to fetch student submissions',
       error: error.message,
-      data: [],
     });
   }
 });
