@@ -1,9 +1,9 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const quizSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
+    ref: 'User',
     required: true,
   },
   question: {
@@ -33,27 +33,27 @@ const quizSchema = new mongoose.Schema({
   // ✅ FIXED: Single language field
   language: {
     type: String,
-    enum: ["english", "french", "spanish", "german", "urdu", "arabic"],
-    default: "english",
+    enum: ['english', 'french', 'spanish', 'german', 'urdu', 'arabic'],
+    default: 'english',
     required: true,
   },
   // ✅ FIXED: Difficulty level
   difficulty: {
     type: String,
-    enum: ["easy", "medium", "hard"],
-    default: "medium",
+    enum: ['easy', 'medium', 'hard'],
+    default: 'medium',
   },
   // ✅ Status for admin quizzes
   status: {
     type: String,
-    enum: ["active", "inactive", "archived"],
-    default: "active",
+    enum: ['active', 'inactive', 'archived'],
+    default: 'active',
   },
   // ✅ Exam type support
   examType: {
     type: String,
-    enum: ["MCAT", "USMLE", "NEET", "General", "Custom"],
-    default: "General",
+    enum: ['MCAT', 'USMLE', 'NEET', 'General', 'Custom'],
+    default: 'General',
   },
   // ✅ Usage statistics
   usageCount: {
@@ -77,7 +77,7 @@ const quizSchema = new mongoose.Schema({
   },
   importSource: {
     type: String,
-    default: "manual",
+    default: 'manual',
   },
   importDate: {
     type: Date,
@@ -85,7 +85,7 @@ const quizSchema = new mongoose.Schema({
   },
   creator: {
     type: String,
-    default: "admin",
+    default: 'admin',
   },
   wikipediaLink: {
     type: String,
@@ -98,7 +98,7 @@ const quizSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now,
-  }
+  },
 });
 
 // ✅ IMPROVED: Better indexes for filtering
@@ -109,13 +109,13 @@ quizSchema.index({ category: 1, language: 1 });
 quizSchema.index({ createdAt: -1 });
 
 // Update timestamp on save
-quizSchema.pre("save", function (next) {
+quizSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });
 
 // ✅ IMPROVED: Static methods for better filtering
-quizSchema.statics.getFilteredQuestions = async function(filters = {}) {
+quizSchema.statics.getFilteredQuestions = async function (filters = {}) {
   const {
     category,
     subCategory,
@@ -124,12 +124,12 @@ quizSchema.statics.getFilteredQuestions = async function(filters = {}) {
     examType,
     limit = 20,
     random = true,
-    status = 'active'
+    status = 'active',
   } = filters;
 
   // Build filter object
   const filter = { status, approved: true };
-  
+
   if (language) filter.language = language;
   if (category) filter.category = new RegExp(category, 'i');
   if (subCategory) filter.subCategory = new RegExp(subCategory, 'i');
@@ -137,7 +137,9 @@ quizSchema.statics.getFilteredQuestions = async function(filters = {}) {
   if (examType) filter.examType = examType;
 
   let query = this.find(filter)
-    .select('question options correctAnswer category subCategory language difficulty examType')
+    .select(
+      'question options correctAnswer category subCategory language difficulty examType'
+    )
     .lean();
 
   // Random sampling
@@ -153,31 +155,36 @@ quizSchema.statics.getFilteredQuestions = async function(filters = {}) {
 };
 
 // ✅ Get categories with counts
-quizSchema.statics.getCategoriesWithCounts = async function() {
+quizSchema.statics.getCategoriesWithCounts = async function () {
   return this.aggregate([
     {
-      $match: { 
+      $match: {
         status: 'active',
         approved: true,
-        category: { $ne: null, $ne: '' }
-      }
+        category: { $ne: null, $ne: '' },
+      },
     },
     {
       $group: {
         _id: '$category',
-        subCategories: { 
+        subCategories: {
           $addToSet: {
             $cond: [
-              { $and: [{ $ne: ['$subCategory', null] }, { $ne: ['$subCategory', ''] }] },
+              {
+                $and: [
+                  { $ne: ['$subCategory', null] },
+                  { $ne: ['$subCategory', ''] },
+                ],
+              },
               '$subCategory',
-              '$$REMOVE'
-            ]
-          }
+              '$$REMOVE',
+            ],
+          },
         },
         count: { $sum: 1 },
         languages: { $addToSet: '$language' },
-        difficulties: { $addToSet: '$difficulty' }
-      }
+        difficulties: { $addToSet: '$difficulty' },
+      },
     },
     {
       $project: {
@@ -186,37 +193,41 @@ quizSchema.statics.getCategoriesWithCounts = async function() {
         count: 1,
         languages: 1,
         difficulties: 1,
-        _id: 0
-      }
+        _id: 0,
+      },
     },
     {
-      $sort: { count: -1 }
-    }
+      $sort: { count: -1 },
+    },
   ]);
 };
 
 // ✅ Get available languages
-quizSchema.statics.getAvailableLanguages = async function() {
+quizSchema.statics.getAvailableLanguages = async function () {
   return this.distinct('language', { status: 'active', approved: true });
 };
 
 // ✅ Get available difficulties
-quizSchema.statics.getAvailableDifficulties = async function() {
+quizSchema.statics.getAvailableDifficulties = async function () {
   return this.distinct('difficulty', { status: 'active', approved: true });
 };
 
 // Static method for bulk operations
-quizSchema.statics.bulkUpdateCategory = async function(quizIds, category, subCategory) {
+quizSchema.statics.bulkUpdateCategory = async function (
+  quizIds,
+  category,
+  subCategory
+) {
   return this.updateMany(
     { _id: { $in: quizIds } },
     {
       $set: {
         category: category,
         subCategory: subCategory,
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     }
   );
 };
 
-export const Quiz = mongoose.models.Quiz || mongoose.model("Quiz", quizSchema);
+export const Quiz = mongoose.models.Quiz || mongoose.model('Quiz', quizSchema);
