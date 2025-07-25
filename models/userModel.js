@@ -79,18 +79,18 @@ const userSchema = new mongoose.Schema({
     default: false,
   },
   // Existing schema mein yeh add karo
-subscriptionDetails: {
-  planType: {
-    type: String,
-    enum: ["monthly", "quarterly"],
+  subscriptionDetails: {
+    planType: {
+      type: String,
+      enum: ["monthly", "quarterly"],
+    },
+    period: String,
+    amount: Number,
+    currency: String,
+    paymentDate: Date,
+    stripeSessionId: String,
+    expiryDate: Date,
   },
-  period: String,
-  amount: Number,
-  currency: String,
-  paymentDate: Date,
-  stripeSessionId: String,
-  expiryDate: Date,
-},
   // ✅ Added timestamps
   createdAt: {
     type: Date,
@@ -109,7 +109,7 @@ subscriptionDetails: {
 });
 
 // ✅ Update updatedAt on save
-userSchema.pre('save', function(next) {
+userSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });
