@@ -12,9 +12,24 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ["admin", "student"],
+    enum: [
+      "admin",
+  "high_school",
+  "some_college",
+  "associate_degree",
+  "bachelors_degree",
+  "post_baccalaureate",
+  "masters_degree",
+  "doctoral_degree",
+  "medical_student",
+  "img",
+  "resident_physician",
+  "practicing_physician",
+  "other_healthcare",
+  "other_education"
+],
     required: true,
-    default: "student",
+    default: "high_school",
   },
   isVerified: {
     type: Boolean,

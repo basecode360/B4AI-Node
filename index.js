@@ -37,6 +37,7 @@ const corsOption = {
       'http://localhost:3000',
       'http://localhost:3001',
       'http://localhost:3002',
+      'https://b4ai.netlify.app/',
     ];
 
     // Check if the origin is in the allowed list
