@@ -106,6 +106,26 @@ const userSchema = new mongoose.Schema({
   lastActive: {
     type: Date,
   },
+  freeQuizUsage: {
+    totalQuestionsUsed: { type: Number, default: 0 },
+    questionsUsedByMode: {
+      TIMED: { type: Number, default: 0 },
+      UNTIMED: { type: Number, default: 0 },
+      'ON-THE-GO': { type: Number, default: 0 }
+    },
+    questionsUsedByLanguage: {
+      type: Map,
+      of: Number,
+      default: {}
+    },
+    lastResetDate: { type: Date, default: Date.now },
+    usageHistory: [{
+      date: Date,
+      questionsUsed: Number,
+      mode: String,
+      language: String
+    }]
+  }
 });
 
 // ✅ Update updatedAt on save
