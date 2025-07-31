@@ -6,7 +6,7 @@ import { userModel } from "../models/userModel.js";
 
 const router = express.Router();
 
-// 📊 Update analytics after quiz completion
+// 📊 ENHANCED: Update analytics after quiz completion (Merged functionality)
 router.post('/update-analytics', authenticateToken, async (req, res) => {
   try {
     console.log('📊 Analytics update request:', req.body);
@@ -20,16 +20,17 @@ router.post('/update-analytics', authenticateToken, async (req, res) => {
       questionTimes,
       bbPointsEarned,
       category,
-      difficulty
+      difficulty,
+      markedQuestions = 0
     } = req.body;
     
     const userId = req.user.userId;
 
     console.log("\n📊 ============ ANALYTICS UPDATE REQUEST ============");
     console.log("👤 User:", userId);
-    console.log("📝 Quiz Data:", { quizMode, totalQuestions, correctAnswers, timeSpent });
+    console.log("📝 Quiz Data:", { quizMode, totalQuestions, correctAnswers, timeSpent, category });
     
-    // ✅ CRITICAL CHECK: BB Points logic
+    //  CRITICAL CHECK: BB Points logic
     if (quizMode === 'TIMED') {
       console.log("💰 TIMED MODE: BB Points will be calculated and added to cumulativeScore");
     } else {
@@ -68,9 +69,11 @@ router.post('/update-analytics', authenticateToken, async (req, res) => {
         message: "Invalid numeric values in quiz data"
       });
     }
+
+    // PRESERVED: Original time stats update
     analytics.timeStats[quizMode] = (analytics.timeStats[quizMode] || 0) + timeSpent;
 
-      // Time per question stats update karo
+    //  PRESERVED: Time per question stats update
     if (questionTimes && questionTimes.length > 0) {
       const avgTime = questionTimes.reduce((sum, time) => sum + time, 0) / questionTimes.length;
       const fastest = Math.min(...questionTimes);
@@ -92,63 +95,54 @@ router.post('/update-analytics', authenticateToken, async (req, res) => {
         analytics.timePerQuestionStats.fastestTime === 0 ? 
         fastest : Math.min(analytics.timePerQuestionStats.fastestTime, fastest);
     
-    analytics.timePerQuestionStats.slowestTime = 
-      Math.max(analytics.timePerQuestionStats.slowestTime, slowest);
-  }
-  // Use the model method to update analytics
-  // await analytics.updateAfterQuiz({
-
-  // ✅ FIXED: Use updated static method with proper BB Points logic
-  const updatedAnalytics = await PerformanceAnalytics.updateWithLastQuiz(userId, {
-    quizMode,
-    totalQuestions,
-    correctAnswers,
-    timeSpent,
-    questionTimes,
-    bbPointsEarned,
-    category,
-    difficulty
-  });
-
-  console.log('✅ Analytics successfully updated');
-    
-  return res.status(200).json({
-    success: true,
-    message: 'Analytics updated successfully!',
-    analytics: {
-      totalQuizzesTaken: updatedAnalytics.totalQuizzesTaken,
-      totalQuestionsAttempted: updatedAnalytics.totalQuestionsAttempted,
-      totalCorrectQuestions: updatedAnalytics.totalCorrectQuestions,
-      accuracyPercentage: updatedAnalytics.accuracyPercentage,
-      cumulativeScore: updatedAnalytics.cumulativeScore,
-      timeStats: updatedAnalytics.timeStats,
-      timePerQuestionStats: updatedAnalytics.timePerQuestionStats,
-      lastQuiz: updatedAnalytics.lastQuiz,
-      questionTimes: questionTimes || []
+      analytics.timePerQuestionStats.slowestTime = 
+        Math.max(analytics.timePerQuestionStats.slowestTime, slowest);
     }
-  });
 
-  console.log("✅ ============ ANALYTICS UPDATE SUCCESSFUL ============");
+    //  ENHANCED: Use updated static method with proper BB Points logic
+    const updatedAnalytics = await PerformanceAnalytics.updateWithLastQuiz(userId, {
+      quizMode,
+      totalQuestions,
+      correctAnswers,
+      timeSpent,
+      questionTimes,
+      bbPointsEarned,
+      category,
+      difficulty,
+      markedQuestions
+    });
+
+    console.log('Analytics successfully updated');
+
+    console.log(" ============ ANALYTICS UPDATE SUCCESSFUL ============");
     console.log("📈 Final Results:");
     console.log("   - Quiz Mode:", quizMode);
     console.log("   - Total BB Points (cumulativeScore):", updatedAnalytics.cumulativeScore);
     console.log("   - Last Quiz BB Points:", updatedAnalytics.lastQuiz.bbPointsEarned);
     console.log("   - Total Quizzes:", updatedAnalytics.totalQuizzesTaken);
     console.log("   - Accuracy:", updatedAnalytics.accuracyPercentage + "%");
+    console.log("   - Last Quiz Score:", updatedAnalytics.lastQuizScore + "%");
     console.log("============================================\n");
-
-    res.json({
+    
+    //  ENHANCED: Return comprehensive response
+    return res.status(200).json({
       success: true,
-      message: "Analytics updated successfully",
+      message: 'Analytics updated successfully!',
       analytics: {
         totalQuizzesTaken: updatedAnalytics.totalQuizzesTaken,
         totalQuestionsAttempted: updatedAnalytics.totalQuestionsAttempted,
         totalCorrectQuestions: updatedAnalytics.totalCorrectQuestions,
         accuracyPercentage: updatedAnalytics.accuracyPercentage,
         cumulativeScore: updatedAnalytics.cumulativeScore, // BB Points (sirf TIMED se)
+        lastQuizScore: updatedAnalytics.lastQuizScore || 0, // 🆕 MISSING FIELD
+        totalBBPoints: updatedAnalytics.totalBBPoints || updatedAnalytics.cumulativeScore, // 🆕 MISSING FIELD
+        quizCountByMode: updatedAnalytics.quizCountByMode || { TIMED: 0, UNTIMED: 0, 'ON-THE-GO': 0 }, // 🆕 MISSING FIELD
         timeStats: updatedAnalytics.timeStats,
         timePerQuestionStats: updatedAnalytics.timePerQuestionStats,
-        lastQuiz: updatedAnalytics.lastQuiz // Last quiz data (har mode save hoti hai)
+        categoryPerformance: updatedAnalytics.getCategoryStats ? updatedAnalytics.getCategoryStats() : {}, // 🆕 PREMIUM FEATURE
+        lastQuiz: updatedAnalytics.lastQuiz, // Last quiz data (har mode save hoti hai)
+        performanceInsights: updatedAnalytics.getPerformanceInsights ? updatedAnalytics.getPerformanceInsights() : null, // 🆕 INSIGHTS
+        questionTimes: questionTimes || []
       }
     });
 
@@ -162,10 +156,10 @@ router.post('/update-analytics', authenticateToken, async (req, res) => {
   }
 });
 
-// 📱 Get user stats (for mobile app) - 4 main points
+// 📱 ENHANCED: Get user stats (for mobile app) - All dashboard requirements
 router.get('/user-stats', authenticateToken, async (req, res) => {
   try {
-    console.log('📈 User stats request for user:', req.user.userId);
+    console.log('📈 Enhanced user stats request for user:', req.user.userId);
     
     const userId = req.user.userId;
 
@@ -180,11 +174,17 @@ router.get('/user-stats', authenticateToken, async (req, res) => {
         success: true,
         message: "No analytics data found",
         analytics: {
+          //  ALL DASHBOARD REQUIREMENTS (6 main points)
           totalQuizzesTaken: 0,
-          totalQuestionsAttempted: 0,
-          totalCorrectQuestions: 0,
-          accuracyPercentage: 0,
-          cumulativeScore: 0, // BB Points = 0
+          totalQuestionsAttempted: 0, 
+          totalCorrectQuestions: 0, 
+          accuracyPercentage: 0, 
+          cumulativeScore: 0, 
+          lastQuizScore: 0, 
+          totalBBPoints: 0, 
+          
+          // Enhanced data
+          quizCountByMode: { TIMED: 0, UNTIMED: 0, 'ON-THE-GO': 0 },
           timeStats: {
             TIMED: 0,
             UNTIMED: 0,
@@ -195,28 +195,42 @@ router.get('/user-stats', authenticateToken, async (req, res) => {
             fastestTime: 0,
             slowestTime: 0
           },
+          categoryPerformance: {}, // Premium feature
+          performanceTrends: [], // Premium feature
           lastQuiz: null
         }
       });
     }
     
-    console.log('✅ User stats retrieved');
+    console.log(' Enhanced user stats retrieved');
     
     return res.status(200).json({
       success: true,
       message: "User stats retrieved successfully",
       analytics: {
+        //  ALL DASHBOARD REQUIREMENTS COMPLIANCE
         totalQuizzesTaken: analytics.totalQuizzesTaken,
-        totalQuestionsAttempted: analytics.totalQuestionsAttempted,
-        totalCorrectQuestions: analytics.totalCorrectQuestions,
-        accuracyPercentage: analytics.accuracyPercentage,
-        cumulativeScore: analytics.cumulativeScore, // BB Points (sirf TIMED se)
+        totalQuestionsAttempted: analytics.totalQuestionsAttempted, // 1. 
+        totalCorrectQuestions: analytics.totalCorrectQuestions, // 2. 
+        accuracyPercentage: analytics.accuracyPercentage, // 3. 
+        cumulativeScore: analytics.cumulativeScore, // 4. 
+        lastQuizScore: analytics.lastQuizScore || 0, // 5. 
+        totalBBPoints: analytics.totalBBPoints || analytics.cumulativeScore, // 6. 
+        
+        // Enhanced analytics data
+        quizCountByMode: analytics.quizCountByMode || { TIMED: 0, UNTIMED: 0, 'ON-THE-GO': 0 },
         timeStats: {
           TIMED: analytics.timeStats.TIMED || 0,
           UNTIMED: analytics.timeStats.UNTIMED || 0,
           'ON-THE-GO': analytics.timeStats['ON-THE-GO'] || 0
         },
         timePerQuestionStats: analytics.timePerQuestionStats,
+        
+        //  PREMIUM FEATURES (For paid users)
+        categoryPerformance: analytics.getCategoryStats ? analytics.getCategoryStats() : {},
+        performanceTrends: analytics.performanceTrends || [],
+        
+        // Last quiz data
         lastQuiz: analytics.lastQuiz // Last quiz data
       }
     });
@@ -231,7 +245,174 @@ router.get('/user-stats', authenticateToken, async (req, res) => {
   }
 });
 
-// 🔧 Admin: Get all users' analytics with detailed info
+// NEW: Get category-wise performance (Premium feature)
+router.get('/category-performance', authenticateToken, async (req, res) => {
+  try {
+    console.log('📂 Category performance request for user:', req.user.userId);
+    
+    const userId = req.user.userId;
+    const analytics = await PerformanceAnalytics.findOne({ userId });
+
+    if (!analytics) {
+      return res.status(200).json({
+        success: true,
+        message: "No analytics data found",
+        categoryPerformance: {},
+        totalCategories: 0
+      });
+    }
+    
+    const categoryStats = analytics.getCategoryStats ? analytics.getCategoryStats() : {};
+    
+    console.log(' Category performance retrieved:', Object.keys(categoryStats).length, 'categories');
+    
+    return res.status(200).json({
+      success: true,
+      message: "Category performance retrieved successfully",
+      categoryPerformance: categoryStats,
+      totalCategories: Object.keys(categoryStats).length,
+      overallStats: {
+        totalQuizzes: analytics.totalQuizzesTaken,
+        totalAccuracy: analytics.accuracyPercentage,
+        strongestCategory: analytics.getStrongestCategory ? analytics.getStrongestCategory() : null,
+        weakestCategory: analytics.getWeakestCategory ? analytics.getWeakestCategory() : null
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Get category performance error:", error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve category performance',
+      error: error.message
+    });
+  }
+});
+
+// NEW: Get performance trends (Premium feature)
+router.get('/performance-trends', authenticateToken, async (req, res) => {
+  try {
+    console.log('📈 Performance trends request for user:', req.user.userId);
+    
+    const userId = req.user.userId;
+    const limit = parseInt(req.query.limit) || 20;
+    
+    const analytics = await PerformanceAnalytics.findOne({ userId });
+
+    if (!analytics || !analytics.performanceTrends) {
+      return res.status(200).json({
+        success: true,
+        message: "No trends data found",
+        trends: [],
+        totalEntries: 0
+      });
+    }
+    
+    // Get recent trends
+    const recentTrends = analytics.performanceTrends.slice(-limit).reverse();
+    
+    // Calculate trend analysis
+    const trendAnalysis = analytics.getRecentTrend ? analytics.getRecentTrend() : null;
+    
+    console.log(' Performance trends retrieved:', recentTrends.length, 'entries');
+    
+    return res.status(200).json({
+      success: true,
+      message: "Performance trends retrieved successfully",
+      trends: recentTrends,
+      totalEntries: analytics.performanceTrends.length,
+      analysis: trendAnalysis,
+      summary: {
+        averageScore: Math.round(recentTrends.reduce((sum, t) => sum + t.score, 0) / recentTrends.length) || 0,
+        bestScore: Math.max(...recentTrends.map(t => t.score)) || 0,
+        mostPlayedMode: getMostPlayedMode(recentTrends),
+        totalBBPointsInTrends: recentTrends.reduce((sum, t) => sum + (t.bbPointsEarned || 0), 0)
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Get performance trends error:", error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve performance trends',
+      error: error.message
+    });
+  }
+});
+
+// Helper function for most played mode
+function getMostPlayedMode(trends) {
+  const modeCounts = {};
+  trends.forEach(t => {
+    modeCounts[t.quizMode] = (modeCounts[t.quizMode] || 0) + 1;
+  });
+  
+  return Object.keys(modeCounts).reduce((a, b) => modeCounts[a] > modeCounts[b] ? a : b, 'TIMED');
+}
+
+// NEW: Get performance insights (Premium feature)
+router.get('/performance-insights', authenticateToken, async (req, res) => {
+  try {
+    console.log('🔍 Performance insights request for user:', req.user.userId);
+    
+    const userId = req.user.userId;
+    const analytics = await PerformanceAnalytics.findOne({ userId });
+
+    if (!analytics) {
+      return res.status(200).json({
+        success: true,
+        message: "No analytics data found",
+        insights: {
+          totalBBPoints: 0,
+          recommendations: ['Take your first quiz to get insights!'],
+          strongestCategory: null,
+          weakestCategory: null,
+          recentTrend: null
+        }
+      });
+    }
+    
+    const insights = analytics.getPerformanceInsights ? analytics.getPerformanceInsights() : {
+      totalBBPoints: analytics.cumulativeScore,
+      bbPointsSource: 'TIMED mode only',
+      timedModeUsage: 0,
+      recommendations: ['Take more quizzes to get better insights']
+    };
+    
+    console.log(' Performance insights generated');
+    
+    return res.status(200).json({
+      success: true,
+      message: "Performance insights retrieved successfully",
+      insights: insights,
+      metadata: {
+        totalQuizzes: analytics.totalQuizzesTaken,
+        totalCategories: analytics.categoryPerformance ? analytics.categoryPerformance.size : 0,
+        dataCompleteness: calculateDataCompleteness(analytics)
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Get performance insights error:", error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve performance insights',
+      error: error.message
+    });
+  }
+});
+
+// Helper function for data completeness
+function calculateDataCompleteness(analytics) {
+  let score = 0;
+  if (analytics.totalQuizzesTaken > 0) score += 25;
+  if (analytics.categoryPerformance && analytics.categoryPerformance.size > 0) score += 25;
+  if (analytics.performanceTrends && analytics.performanceTrends.length > 5) score += 25;
+  if (analytics.cumulativeScore > 0) score += 25;
+  return score;
+}
+
+// 🔧 ENHANCED: Admin get all users' analytics with detailed info
 router.get('/admin/all-stats', authenticateToken, async (req, res) => {
   try {
     console.log('🔧 Admin all stats request');
@@ -270,7 +451,7 @@ router.get('/admin/all-stats', authenticateToken, async (req, res) => {
       .limit(limit)
       .lean();
     
-    console.log(`✅ Found ${analytics.length} analytics records`);
+    console.log(` Found ${analytics.length} analytics records`);
     
     // Transform data for admin dashboard
     const transformedAnalytics = analytics.map(analytic => ({
@@ -283,18 +464,25 @@ router.get('/admin/all-stats', authenticateToken, async (req, res) => {
         isVerified: analytic.userId.isVerified,
         joinedAt: analytic.userId.createdAt
       } : null,
-      // All 7 points for admin
+      
+      //  ALL DASHBOARD REQUIREMENTS FOR ADMIN (7 points)
       totalQuizzesTaken: analytic.totalQuizzesTaken,
       totalQuestionsAttempted: analytic.totalQuestionsAttempted,
       totalCorrectQuestions: analytic.totalCorrectQuestions,
       accuracyPercentage: analytic.accuracyPercentage,
       cumulativeScore: analytic.cumulativeScore,
+      lastQuizScore: analytic.lastQuizScore || 0, // 🆕
+      totalBBPoints: analytic.totalBBPoints || analytic.cumulativeScore, // 🆕
+      
+      // Enhanced admin data
+      quizCountByMode: analytic.quizCountByMode,
       timeStats: analytic.timeStats,
       timePerQuestionStats: analytic.timePerQuestionStats,
-      lastQuiz: analytic.lastQuiz,
       categoryPerformance: analytic.categoryPerformance ? 
         Object.fromEntries(analytic.categoryPerformance) : {},
+      performanceTrendsCount: analytic.performanceTrends ? analytic.performanceTrends.length : 0,
       difficultyPerformance: analytic.difficultyPerformance,
+      lastQuiz: analytic.lastQuiz,
       lastUpdated: analytic.lastUpdated,
       createdAt: analytic.createdAt
     }));
@@ -321,45 +509,7 @@ router.get('/admin/all-stats', authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ SAME: Get last quiz details route
-router.get("/last-quiz", authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-
-    console.log("📊 GET LAST QUIZ REQUEST for user:", userId);
-
-    const analytics = await PerformanceAnalytics.findOne({ userId }).select('lastQuiz');
-
-    if (!analytics || !analytics.lastQuiz) {
-      return res.json({
-        success: true,
-        message: "No last quiz data found",
-        lastQuiz: null
-      });
-    }
-
-    console.log("✅ Last quiz data retrieved:");
-    console.log("   - Mode:", analytics.lastQuiz.quizMode);
-    console.log("   - BB Points:", analytics.lastQuiz.bbPointsEarned);
-    console.log("   - Accuracy:", analytics.lastQuiz.accuracy + "%");
-
-    res.json({
-      success: true,
-      message: "Last quiz data retrieved successfully",
-      lastQuiz: analytics.lastQuiz
-    });
-
-  } catch (error) {
-    console.error("❌ Get last quiz error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to retrieve last quiz data",
-      error: error.message
-    });
-  }
-});
-
-// 📊 Admin: Get summary statistics
+// 📊 ENHANCED: Admin summary statistics
 router.get('/admin/summary', authenticateToken, async (req, res) => {
   try {
     console.log('📊 Admin summary stats request');
@@ -375,19 +525,24 @@ router.get('/admin/summary', authenticateToken, async (req, res) => {
           totalQuizzesTaken: { $sum: "$totalQuizzesTaken" },
           totalQuestionsAttempted: { $sum: "$totalQuestionsAttempted" },
           totalCorrectQuestions: { $sum: "$totalCorrectQuestions" },
+          totalBBPoints: { $sum: "$cumulativeScore" }, // 🆕 BB Points total
           avgAccuracy: { $avg: "$accuracyPercentage" },
           avgCumulativeScore: { $avg: "$cumulativeScore" },
+          avgLastQuizScore: { $avg: "$lastQuizScore" }, // 🆕
           totalTimedTime: { $sum: "$timeStats.TIMED" },
           totalUntimedTime: { $sum: "$timeStats.UNTIMED" },
           totalTutorTime: { $sum: "$timeStats.TUTOR" },
-          totalOnTheGoTime: { $sum: "$timeStats.ON-THE-GO" }
+          totalOnTheGoTime: { $sum: "$timeStats.ON-THE-GO" },
+          totalTimedQuizzes: { $sum: "$quizCountByMode.TIMED" }, // 🆕
+          totalUntimedQuizzes: { $sum: "$quizCountByMode.UNTIMED" }, // 🆕
+          totalOnTheGoQuizzes: { $sum: "$quizCountByMode.ON-THE-GO" } // 🆕
         }
       }
     ];
 
     // Run the summary pipeline and assign result to summary
     const [summary] = await PerformanceAnalytics.aggregate(summaryPipeline);
-
+    
     // Total quizzes taken across all users
     const totalQuizzesTaken = await PerformanceAnalytics.aggregate([
       { $group: { _id: null, total: { $sum: "$totalQuizzesTaken" } } }
@@ -438,28 +593,53 @@ router.get('/admin/summary', authenticateToken, async (req, res) => {
           _id: "$categoryPerformance.k",
           totalAttempted: { $sum: "$categoryPerformance.v.attempted" },
           totalCorrect: { $sum: "$categoryPerformance.v.correct" },
-          avgAccuracy: { $avg: "$categoryPerformance.v.accuracy" }
+          avgAccuracy: { $avg: "$categoryPerformance.v.accuracy" },
+          totalQuizzes: { $sum: "$categoryPerformance.v.totalQuizzes" }
         }
       },
       { $match: { _id: { $ne: null } } },
-      { $sort: { totalAttempted: -1 } }
+      { $sort: { totalAttempted: -1 } },
+      { $limit: 10 }
     ]);
+    
+    // Top performers by BB Points
+    const topBBPointsEarners = await PerformanceAnalytics.find({})
+      .populate('userId', 'email profile.firstName profile.lastName')
+      .sort({ cumulativeScore: -1 })
+      .limit(5)
+      .select('userId cumulativeScore totalQuizzesTaken accuracyPercentage')
+      .lean();
     
     return res.status(200).json({
       success: true,
       summary: {
+        // Basic totals
         totalUsersWithAnalytics: summary?.totalUsers || 0,
         totalQuizzesTaken: summary?.totalQuizzesTaken || totalQuizzesTaken[0]?.total || 0,
         totalQuestionsAttempted: summary?.totalQuestionsAttempted || totalQuestionsAttempted[0]?.total || 0,
         totalCorrectQuestions: summary?.totalCorrectQuestions || 0,
+        totalBBPointsEarned: summary?.totalBBPoints || 0, // 🆕
+        
+        // Averages
         averageAccuracy: Math.round(averageAccuracy[0]?.avgAccuracy || 0),
         averageCumulativeScore: Math.round(summary?.avgCumulativeScore || 0),
-        modeTimeDistribution: {
+        averageLastQuizScore: Math.round(summary?.avgLastQuizScore || 0), // 🆕
+        
+        // Mode distribution
+        modeDistribution: {
+          totalTimedQuizzes: summary?.totalTimedQuizzes || 0, // 🆕 ACCURATE
+          totalUntimedQuizzes: summary?.totalUntimedQuizzes || 0, // 🆕 ACCURATE  
+          totalOnTheGoQuizzes: summary?.totalOnTheGoQuizzes || 0, // 🆕 ACCURATE
           totalTimedTime: summary?.totalTimedTime || 0,
           totalUntimedTime: summary?.totalUntimedTime || 0,
           totalTutorTime: summary?.totalTutorTime || 0,
           totalOnTheGoTime: summary?.totalOnTheGoTime || 0
         },
+        
+        // Enhanced insights
+        categoryStats: categoryStats,
+        totalCategoriesPlayed: categoryStats.length,
+        
         topPerformers: topPerformers.map(p => ({
           userId: p.userId?._id,
           name: `${p.userId?.profile?.firstName || ''} ${p.userId?.profile?.lastName || ''}`.trim() || 'No Name',
@@ -467,6 +647,7 @@ router.get('/admin/summary', authenticateToken, async (req, res) => {
           accuracy: p.accuracyPercentage,
           totalQuizzes: p.totalQuizzesTaken
         })),
+        
         mostActiveUsers: mostActiveUsers.map(u => ({
           userId: u.userId?._id,
           name: `${u.userId?.profile?.firstName || ''} ${u.userId?.profile?.lastName || ''}`.trim() || 'No Name',
@@ -474,7 +655,16 @@ router.get('/admin/summary', authenticateToken, async (req, res) => {
           totalQuizzes: u.totalQuizzesTaken,
           totalQuestions: u.totalQuestionsAttempted
         })),
-        categoryStats
+        
+        // Top performers by BB Points
+        topBBPointsEarners: topBBPointsEarners.map(p => ({
+          userId: p.userId?._id,
+          name: `${p.userId?.profile?.firstName || ''} ${p.userId?.profile?.lastName || ''}`.trim() || 'No Name',
+          email: p.userId?.email,
+          bbPoints: p.cumulativeScore,
+          accuracy: p.accuracyPercentage,
+          totalQuizzes: p.totalQuizzesTaken
+        }))
       }
     });
     
@@ -488,7 +678,50 @@ router.get('/admin/summary', authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ ENHANCED: BB Points summary route with better calculations
+//  SAME: Get last quiz details route
+router.get("/last-quiz", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    console.log("📊 GET LAST QUIZ REQUEST for user:", userId);
+
+    const analytics = await PerformanceAnalytics.findOne({ userId }).select('lastQuiz');
+
+    if (!analytics || !analytics.lastQuiz) {
+      return res.json({
+        success: true,
+        message: "No last quiz data found",
+        data: {
+          lastQuiz: null
+        }
+      });
+    }
+
+    console.log(" Last quiz data retrieved:");
+    console.log("   - Mode:", analytics.lastQuiz.quizMode);
+    console.log("   - BB Points:", analytics.lastQuiz.bbPointsEarned);
+    console.log("   - Accuracy:", analytics.lastQuiz.accuracy + "%");
+    console.log("   - Category:", analytics.lastQuiz.category || 'None');
+
+    res.json({
+      success: true,
+      message: "Last quiz data retrieved successfully",
+      data: {
+        lastQuiz: analytics.lastQuiz
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Get last quiz error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to retrieve last quiz data",
+      error: error.message
+    });
+  }
+});
+
+//  ENHANCED: BB Points summary route with better calculations
 router.get("/bb-points-summary", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -510,76 +743,16 @@ router.get("/bb-points-summary", authenticateToken, async (req, res) => {
       });
     }
 
-    // ✅ BETTER: Calculate timed quiz count from total time and average time
+    //  BETTER: Use exact TIMED quiz count from quizCountByMode
+    const timedQuizCount = analytics.quizCountByMode?.TIMED || 0;
+    
+    //  BACKUP: Calculate timed quiz count from total time and average time if needed
     const totalTime = analytics.timeStats.TIMED + 
                      analytics.timeStats.UNTIMED + 
                      analytics.timeStats['ON-THE-GO'];
     
-    const [summary] = await PerformanceAnalytics.aggregate(summaryPipeline);
-    
-    // Get top performers
-    const topPerformers = await PerformanceAnalytics.find({})
-      .populate('userId', 'email profile.firstName profile.lastName')
-      .sort({ accuracyPercentage: -1 })
-      .limit(5)
-      .lean();
-    
-    // Get most active users
-    const mostActiveUsers = await PerformanceAnalytics.find({})
-      .populate('userId', 'email profile.firstName profile.lastName')
-      .sort({ totalQuizzesTaken: -1 })
-      .limit(5)
-      .lean();
-    
-    // Category statistics
-    const categoryStats = await PerformanceAnalytics.aggregate([
-      { $unwind: { path: "$categoryPerformance", preserveNullAndEmptyArrays: true } },
-      {
-        $group: {
-          _id: "$categoryPerformance.k",
-          totalAttempted: { $sum: "$categoryPerformance.v.attempted" },
-          totalCorrect: { $sum: "$categoryPerformance.v.correct" },
-          avgAccuracy: { $avg: "$categoryPerformance.v.accuracy" }
-        }
-      },
-      { $match: { _id: { $ne: null } } },
-      { $sort: { totalAttempted: -1 } }
-    ]);
-    
-    return res.status(200).json({
-      success: true,
-      summary: {
-        totalUsersWithAnalytics: summary?.totalUsers || 0,
-        totalQuizzesTaken: summary?.totalQuizzesTaken || totalQuizzesTaken[0]?.total || 0,
-        totalQuestionsAttempted: summary?.totalQuestionsAttempted || totalQuestionsAttempted[0]?.total || 0,
-        totalCorrectQuestions: summary?.totalCorrectQuestions || 0,
-        averageAccuracy: Math.round(averageAccuracy[0]?.avgAccuracy || 0),
-        averageCumulativeScore: Math.round(summary?.avgCumulativeScore || 0),
-        modeTimeDistribution: {
-          totalTimedTime: summary?.totalTimedTime || 0,
-          totalUntimedTime: summary?.totalUntimedTime || 0,
-          totalTutorTime: summary?.totalTutorTime || 0,
-          totalOnTheGoTime: summary?.totalOnTheGoTime || 0
-        },
-        topPerformers: topPerformers.map(p => ({
-          userId: p.userId?._id,
-          name: `${p.userId?.profile?.firstName || ''} ${p.userId?.profile?.lastName || ''}`.trim() || 'No Name',
-          email: p.userId?.email,
-          accuracy: p.accuracyPercentage,
-          totalQuizzes: p.totalQuizzesTaken
-        })),
-        mostActiveUsers: mostActiveUsers.map(u => ({
-          userId: u.userId?._id,
-          name: `${u.userId?.profile?.firstName || ''} ${u.userId?.profile?.lastName || ''}`.trim() || 'No Name',
-          email: u.userId?.email,
-          totalQuizzes: u.totalQuizzesTaken,
-          totalQuestions: u.totalQuestionsAttempted
-        })),
-        categoryStats
-      }
-    });
     const timedRatio = totalTime > 0 ? analytics.timeStats.TIMED / totalTime : 0;
-    const estimatedTimedQuizzes = Math.round(analytics.totalQuizzesTaken * timedRatio);
+    const estimatedTimedQuizzes = timedQuizCount > 0 ? timedQuizCount : Math.round(analytics.totalQuizzesTaken * timedRatio);
 
     const bbPointsSummary = {
       totalBBPoints: analytics.cumulativeScore, // Total BB Points (sirf TIMED se)
@@ -587,15 +760,18 @@ router.get("/bb-points-summary", authenticateToken, async (req, res) => {
       timedQuizCount: estimatedTimedQuizzes,
       averageBBPointsPerQuiz: estimatedTimedQuizzes > 0 ? 
         Math.round(analytics.cumulativeScore / estimatedTimedQuizzes) : 0,
-      // ✅ BONUS: Additional insights
+      //  BONUS: Additional insights
       timedTimePercentage: Math.round(timedRatio * 100),
-      lastQuizMode: analytics.lastQuiz?.quizMode || null
+      lastQuizMode: analytics.lastQuiz?.quizMode || null,
+      //  Enhanced metrics
+      exactTimedQuizCount: timedQuizCount,
+      lastQuizScore: analytics.lastQuizScore || 0
     };
 
-    console.log("✅ BB Points summary retrieved:");
+    console.log(" BB Points summary retrieved:");
     console.log("   - Total BB Points:", bbPointsSummary.totalBBPoints);
     console.log("   - Last Quiz BB Points:", bbPointsSummary.lastQuizBBPoints);
-    console.log("   - Estimated TIMED Quizzes:", bbPointsSummary.timedQuizCount);
+    console.log("   - Exact TIMED Quizzes:", bbPointsSummary.exactTimedQuizCount);
     console.log("   - TIMED Time %:", bbPointsSummary.timedTimePercentage + "%");
 
     res.json({
@@ -609,6 +785,54 @@ router.get("/bb-points-summary", authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to retrieve BB Points summary",
+      error: error.message
+    });
+  }
+});
+
+// NEW: BB Points leaderboard
+router.get('/leaderboard/bb-points', authenticateToken, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    
+    console.log('🏆 BB Points leaderboard request, limit:', limit);
+    
+    const leaderboard = await PerformanceAnalytics.find({ cumulativeScore: { $gt: 0 } })
+      .populate('userId', 'email profile.firstName profile.lastName')
+      .sort({ cumulativeScore: -1 })
+      .limit(limit)
+      .select('userId cumulativeScore totalQuizzesTaken accuracyPercentage quizCountByMode lastQuiz')
+      .lean();
+    
+    const transformedLeaderboard = leaderboard.map((entry, index) => ({
+      rank: index + 1,
+      user: {
+        _id: entry.userId._id,
+        name: `${entry.userId.profile?.firstName || ''} ${entry.userId.profile?.lastName || ''}`.trim() || 'Anonymous',
+        email: entry.userId.email.substring(0, 3) + '***' // Partial privacy
+      },
+      bbPoints: entry.cumulativeScore,
+      accuracy: entry.accuracyPercentage,
+      totalQuizzes: entry.totalQuizzesTaken,
+      timedQuizzes: entry.quizCountByMode?.TIMED || 0,
+      lastQuizMode: entry.lastQuiz?.quizMode || 'Unknown'
+    }));
+    
+    console.log('✅ BB Points leaderboard retrieved:', transformedLeaderboard.length, 'entries');
+    
+    return res.status(200).json({
+      success: true,
+      message: "BB Points leaderboard retrieved successfully",
+      leaderboard: transformedLeaderboard,
+      totalEntries: transformedLeaderboard.length,
+      note: "BB Points are earned only from TIMED mode quizzes"
+    });
+    
+  } catch (error) {
+    console.error('❌ BB Points leaderboard error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve BB Points leaderboard',
       error: error.message
     });
   }
@@ -647,12 +871,16 @@ router.get('/admin/user/:userId', authenticateToken, async (req, res) => {
           totalCorrectQuestions: analytics.totalCorrectQuestions,
           accuracyPercentage: analytics.accuracyPercentage,
           cumulativeScore: analytics.cumulativeScore,
+          lastQuizScore: analytics.lastQuizScore || 0, // 🆕
+          totalBBPoints: analytics.totalBBPoints || analytics.cumulativeScore, // 🆕
+          quizCountByMode: analytics.quizCountByMode, // 🆕
           timeStats: analytics.timeStats,
           timePerQuestionStats: analytics.timePerQuestionStats
         },
         lastQuiz: analytics.lastQuiz,
         categoryPerformance: analytics.categoryPerformance ? 
           Object.fromEntries(analytics.categoryPerformance) : {},
+        performanceTrends: analytics.performanceTrends || [], // 🆕
         difficultyPerformance: analytics.difficultyPerformance,
         metadata: {
           lastUpdated: analytics.lastUpdated,
@@ -671,7 +899,7 @@ router.get('/admin/user/:userId', authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ NEW: Verify BB Points source - Debug endpoint
+//NEW: Verify BB Points source - Debug endpoint
 router.get("/verify-bb-points", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -695,6 +923,9 @@ router.get("/verify-bb-points", authenticateToken, async (req, res) => {
 
     const verification = {
       cumulativeScore: analytics.cumulativeScore,
+      lastQuizScore: analytics.lastQuizScore || 0, // 🆕
+      totalBBPoints: analytics.totalBBPoints || analytics.cumulativeScore, // 🆕
+      exactTimedQuizCount: analytics.quizCountByMode?.TIMED || 0, // 🆕
       timeStats: {
         TIMED: analytics.timeStats.TIMED || 0,
         UNTIMED: analytics.timeStats.UNTIMED || 0,
@@ -712,8 +943,9 @@ router.get("/verify-bb-points", authenticateToken, async (req, res) => {
         '🎯 Continue taking TIMED quizzes to earn more BB Points'
     };
 
-    console.log("✅ BB Points verification completed:");
+    console.log(" BB Points verification completed:");
     console.log("   - Cumulative Score:", verification.cumulativeScore);
+    console.log("   - Exact TIMED Quizzes:", verification.exactTimedQuizCount);
     console.log("   - TIMED Time %:", verification.timedTimePercentage);
     console.log("   - Status:", verification.warning);
 
@@ -751,7 +983,7 @@ router.delete('/admin/reset/:userId', authenticateToken, async (req, res) => {
       });
     }
     
-    console.log('✅ Analytics reset successfully');
+    console.log(' Analytics reset successfully');
     
     return res.status(200).json({
       success: true,
@@ -768,7 +1000,7 @@ router.delete('/admin/reset/:userId', authenticateToken, async (req, res) => {
   }
 });
 
-// 📥 Admin: Export analytics data
+// 📥 ENHANCED: Admin export analytics data
 router.get('/admin/export', authenticateToken, async (req, res) => {
   try {
     console.log('📥 Export analytics request');
@@ -783,7 +1015,7 @@ router.get('/admin/export', authenticateToken, async (req, res) => {
       .lean();
     
     if (format === 'csv') {
-      // Convert to CSV format
+      // Enhanced CSV headers
       const csvHeaders = [
         'User Email',
         'User Name',
@@ -792,6 +1024,11 @@ router.get('/admin/export', authenticateToken, async (req, res) => {
         'Correct Answers',
         'Accuracy %',
         'Cumulative Score',
+        'Last Quiz Score',
+        'Total BB Points', 
+        'TIMED Quizzes', 
+        'UNTIMED Quizzes', 
+        'ON-THE-GO Quizzes', 
         'Time in TIMED',
         'Time in UNTIMED',
         'Time in TUTOR',
@@ -808,6 +1045,11 @@ router.get('/admin/export', authenticateToken, async (req, res) => {
         a.totalCorrectQuestions,
         a.accuracyPercentage,
         a.cumulativeScore,
+        a.lastQuizScore || 0, 
+        a.totalBBPoints || a.cumulativeScore, 
+        a.quizCountByMode?.TIMED || 0, 
+        a.quizCountByMode?.UNTIMED || 0, 
+        a.quizCountByMode?.['ON-THE-GO'] || 0, 
         a.timeStats.TIMED,
         a.timeStats.UNTIMED,
         a.timeStats.TUTOR,
@@ -840,6 +1082,9 @@ router.get('/admin/export', authenticateToken, async (req, res) => {
         totalCorrectQuestions: a.totalCorrectQuestions,
         accuracyPercentage: a.accuracyPercentage,
         cumulativeScore: a.cumulativeScore,
+        lastQuizScore: a.lastQuizScore || 0, 
+        totalBBPoints: a.totalBBPoints || a.cumulativeScore, 
+        quizCountByMode: a.quizCountByMode, 
         timeStats: a.timeStats,
         timePerQuestionStats: a.timePerQuestionStats,
         lastUpdated: a.lastUpdated
@@ -856,7 +1101,114 @@ router.get('/admin/export', authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ ENHANCED: Reset analytics route with confirmation
+// NEW: Export enhanced analytics
+router.get('/admin/export-enhanced', authenticateToken, async (req, res) => {
+  try {
+    console.log('📥 Enhanced export request');
+    
+    const format = req.query.format || 'json';
+    const includeCategories = req.query.includeCategories === 'true';
+    const includeTrends = req.query.includeTrends === 'true';
+    
+    // Get all analytics with enhanced data
+    const analytics = await PerformanceAnalytics.find({})
+      .populate('userId', 'email profile.firstName profile.lastName')
+      .lean();
+    
+    const enhancedData = analytics.map(a => {
+      const baseData = {
+        userEmail: a.userId?.email || '',
+        userName: `${a.userId?.profile?.firstName || ''} ${a.userId?.profile?.lastName || ''}`.trim(),
+        
+        // ALL DASHBOARD REQUIREMENTS
+        totalQuizzes: a.totalQuizzesTaken,
+        totalQuestionsAttempted: a.totalQuestionsAttempted,
+        totalCorrectQuestions: a.totalCorrectQuestions,
+        accuracyPercentage: a.accuracyPercentage,
+        cumulativeScore: a.cumulativeScore,
+        lastQuizScore: a.lastQuizScore || 0,
+        totalBBPoints: a.totalBBPoints || a.cumulativeScore,
+        
+        // Quiz mode breakdown
+        timedQuizzes: a.quizCountByMode?.TIMED || 0,
+        untimedQuizzes: a.quizCountByMode?.UNTIMED || 0,
+        onTheGoQuizzes: a.quizCountByMode?.['ON-THE-GO'] || 0,
+        
+        // Time stats
+        timedTime: a.timeStats?.TIMED || 0,
+        untimedTime: a.timeStats?.UNTIMED || 0,
+        onTheGoTime: a.timeStats?.['ON-THE-GO'] || 0,
+        avgTimePerQuestion: a.timePerQuestionStats?.averageTime || 0,
+        
+        lastUpdated: new Date(a.lastUpdated).toISOString()
+      };
+      
+      // Add category data if requested
+      if (includeCategories && a.categoryPerformance) {
+        baseData.categoryPerformance = Object.fromEntries(a.categoryPerformance);
+        baseData.totalCategories = a.categoryPerformance.size;
+      }
+      
+      // Add trends data if requested
+      if (includeTrends && a.performanceTrends) {
+        baseData.performanceTrends = a.performanceTrends;
+        baseData.totalTrends = a.performanceTrends.length;
+      }
+      
+      return baseData;
+    });
+    
+    if (format === 'csv') {
+      // Enhanced CSV headers
+      const csvHeaders = [
+        'User Email', 'User Name', 'Total Quizzes', 'Questions Attempted', 'Correct Answers',
+        'Accuracy %', 'Cumulative Score', 'Last Quiz Score', 'Total BB Points',
+        'TIMED Quizzes', 'UNTIMED Quizzes', 'ON-THE-GO Quizzes',
+        'TIMED Time', 'UNTIMED Time', 'ON-THE-GO Time', 'Avg Time per Question',
+        'Last Updated'
+      ].join(',');
+      
+      const csvRows = enhancedData.map(a => [
+        a.userEmail, a.userName, a.totalQuizzes, a.totalQuestionsAttempted,
+        a.totalCorrectQuestions, a.accuracyPercentage, a.cumulativeScore,
+        a.lastQuizScore, a.totalBBPoints, a.timedQuizzes, a.untimedQuizzes,
+        a.onTheGoQuizzes, a.timedTime, a.untimedTime, a.onTheGoTime,
+        a.avgTimePerQuestion.toFixed(2), a.lastUpdated
+      ].join(','));
+      
+      const csv = [csvHeaders, ...csvRows].join('\n');
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=enhanced_analytics_export.csv');
+      return res.send(csv);
+    }
+    
+    // JSON export
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename=enhanced_analytics_export.json');
+    return res.json({
+      success: true,
+      exportDate: new Date().toISOString(),
+      totalRecords: enhancedData.length,
+      exportOptions: {
+        format,
+        includeCategories,
+        includeTrends
+      },
+      data: enhancedData
+    });
+    
+  } catch (error) {
+    console.error('❌ Enhanced export error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to export enhanced analytics',
+      error: error.message
+    });
+  }
+});
+
+// ENHANCED: Reset analytics route with confirmation
 router.delete("/reset-analytics", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -880,12 +1232,12 @@ router.delete("/reset-analytics", authenticateToken, async (req, res) => {
       });
     }
 
-    console.log("✅ Analytics data reset successfully");
+    console.log(" Analytics data reset successfully");
 
     res.json({
       success: true,
-      message: "Analytics data reset successfully! Start fresh with TIMED mode testing.",
-      note: "Take TIMED quizzes to earn BB Points (cumulativeScore)"
+      message: "Analytics data reset successfully! All performance data cleared.",
+      note: "Take TIMED quizzes to earn BB Points and rebuild your analytics"
     });
 
   } catch (error) {
@@ -898,7 +1250,7 @@ router.delete("/reset-analytics", authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ SAME: Analytics overview route
+// SAME: Analytics overview route
 router.get("/overview", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -929,31 +1281,42 @@ router.get("/overview", authenticateToken, async (req, res) => {
         totalCorrectQuestions: analytics.totalCorrectQuestions,
         incorrectQuestions,
         accuracyPercentage: analytics.accuracyPercentage,
-        cumulativeScore: analytics.cumulativeScore // BB Points
+        cumulativeScore: analytics.cumulativeScore, 
+        lastQuizScore: analytics.lastQuizScore || 0, // 
+        totalBBPoints: analytics.totalBBPoints || analytics.cumulativeScore 
       },
-      timeBreakdown: {
-        totalTimeSpent,
+      quizModeBreakdown: { // Enhanced breakdown
+        quizCountByMode: analytics.quizCountByMode || { TIMED: 0, UNTIMED: 0, 'ON-THE-GO': 0 },
         timeStats: {
           TIMED: analytics.timeStats.TIMED || 0,
           UNTIMED: analytics.timeStats.UNTIMED || 0,
           'ON-THE-GO': analytics.timeStats['ON-THE-GO'] || 0
-        },
+        }
+      },
+      timeBreakdown: {
+        totalTimeSpent,
         timePerQuestionStats: analytics.timePerQuestionStats
       },
       lastQuizInfo: analytics.lastQuiz,
+      categoryInsights: { // Category insights
+        totalCategories: analytics.categoryPerformance ? analytics.categoryPerformance.size : 0,
+        strongestCategory: analytics.getStrongestCategory ? analytics.getStrongestCategory() : null,
+        weakestCategory: analytics.getWeakestCategory ? analytics.getWeakestCategory() : null
+      },
       timestamps: {
         accountCreated: analytics.createdAt,
         lastUpdated: analytics.lastUpdated
       },
-      // ✅ BONUS: BB Points insights
+      // BONUS: BB Points insights
       bbPointsInsights: {
         totalBBPoints: analytics.cumulativeScore,
         lastQuizBBPoints: analytics.lastQuiz?.bbPointsEarned || 0,
+        exactTimedQuizzes: analytics.quizCountByMode?.TIMED || 0, // 🆕
         bbPointsSource: 'Only from TIMED mode quizzes'
       }
     };
 
-    console.log("✅ Analytics overview retrieved successfully");
+    console.log(" Analytics overview retrieved successfully");
 
     res.json({
       success: true,
@@ -971,7 +1334,7 @@ router.get("/overview", authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ ENHANCED: Leaderboard route with BB Points focus
+// ENHANCED: Leaderboard route with BB Points focus
 router.get("/leaderboard", authenticateToken, async (req, res) => {
   try {
     const { limit = 10, mode = 'bb-points' } = req.query;
@@ -989,7 +1352,7 @@ router.get("/leaderboard", authenticateToken, async (req, res) => {
       .populate('userId', 'email profile.firstName profile.lastName')
       .sort({ [sortField]: -1 })
       .limit(parseInt(limit))
-      .select('userId totalQuizzesTaken totalQuestionsAttempted totalCorrectQuestions accuracyPercentage cumulativeScore lastQuiz timeStats');
+      .select('userId totalQuizzesTaken totalQuestionsAttempted totalCorrectQuestions accuracyPercentage cumulativeScore lastQuiz timeStats quizCountByMode');
 
     const transformedLeaderboard = leaderboard.map((entry, index) => {
       // Calculate TIMED quiz ratio
@@ -1011,7 +1374,8 @@ router.get("/leaderboard", authenticateToken, async (req, res) => {
           accuracy: entry.accuracyPercentage,
           bbPoints: entry.cumulativeScore, // BB Points from TIMED mode only
           lastQuizMode: entry.lastQuiz?.quizMode || null,
-          timedModePercentage: Math.round(timedRatio)
+          timedModePercentage: Math.round(timedRatio),
+          exactTimedQuizzes: entry.quizCountByMode?.TIMED || 0 //  Exact count
         }
       };
     });
@@ -1038,3 +1402,4 @@ router.get("/leaderboard", authenticateToken, async (req, res) => {
 });
 
 export default router;
+//routes/analytics.route.js

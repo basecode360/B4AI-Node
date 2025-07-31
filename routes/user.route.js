@@ -49,6 +49,226 @@ router.post('/logout-enhanced', extractSessionId, logoutEnhanced); // New enhanc
 router.post('/revoke-all', authenticateToken, revokeAllSessions);
 router.get('/sessions', authenticateToken, getUserSessions);
 
+// ✅ Get Account Deletion Info endpoint
+router.get('/deletion-info', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    console.log('🔍 Getting deletion info for user:', userId);
+
+    // Find user
+    const user = await userModel.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Get user analytics to show what will be deleted
+    const analytics = await PerformanceAnalytics.findOne({ userId });
+    console.log('📊 User analytics found:', !!analytics);
+
+    const deletionInfo = {
+      accountInfo: {
+        email: user.email,
+        name: `${user.profile?.firstName || ''} ${user.profile?.lastName || ''}`.trim() || 'User',
+        memberSince: user.createdAt
+      },
+      dataToDelete: {
+        quizzesCreated: 0, // If you have user-created quizzes
+        totalQuizzesTaken: analytics?.totalQuizzesTaken || 0,
+        totalQuestions: analytics?.totalQuestionsAttempted || 0,
+        bbPoints: analytics?.cumulativeScore || 0,
+        analyticsData: !!analytics,
+        profileData: true,
+        allPersonalData: true
+      }
+    };
+
+    console.log('✅ Deletion info prepared:', deletionInfo);
+
+    res.json({
+      success: true,
+      message: 'Account deletion info retrieved successfully',
+      info: deletionInfo
+    });
+
+  } catch (error) {
+    console.error('❌ Get deletion info error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get deletion info',
+      error: error.message
+    });
+  }
+});
+
+// ✅ Delete Account endpoint - COMPLETE IMPLEMENTATION
+router.delete('/delete-account', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { password, confirmation } = req.body;
+
+    console.log('🗑️ Delete account request for user:', userId);
+    console.log('🔍 Confirmation text received:', confirmation);
+
+    // Validate required fields
+    if (!password || !confirmation) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password and confirmation are required'
+      });
+    }
+
+    // Validate confirmation text
+    if (confirmation !== 'DELETE') {
+      return res.status(400).json({
+        success: false,
+        message: 'You must type DELETE to confirm account deletion'
+      });
+    }
+
+    // Find user and verify password
+    const user = await userModel.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid password'
+      });
+    }
+
+    // Collect deletion summary before deletion
+    const analytics = await PerformanceAnalytics.findOne({ userId });
+    const deletionSummary = {
+      email: user.email,
+      name: `${user.profile?.firstName || ''} ${user.profile?.lastName || ''}`.trim() || 'User',
+      deletedData: {
+        quizzesTaken: analytics?.totalQuizzesTaken || 0,
+        questionsAnswered: analytics?.totalQuestionsAttempted || 0,
+        bbPointsEarned: analytics?.cumulativeScore || 0,
+        analyticsRecords: !!analytics,
+        accountAge: Math.floor((new Date() - new Date(user.createdAt)) / (1000 * 60 * 60 * 24)) + ' days'
+      },
+      deletionDate: new Date().toISOString()
+    };
+
+    console.log('📊 Deletion summary:', deletionSummary);
+
+    // Start transaction for atomic deletion
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // 1. Delete user analytics
+      if (analytics) {
+        await PerformanceAnalytics.deleteOne({ userId }, { session });
+        console.log('✅ Analytics deleted');
+      }
+      // 4. Delete the user account
+      await userModel.deleteOne({ _id: userId }, { session });
+      console.log('✅ User account deleted');
+
+      // Commit transaction
+      await session.commitTransaction();
+      console.log('✅ All user data deleted successfully');
+
+      // Send deletion confirmation email (optional)
+      try {
+        if (sendEmail) {
+          await sendEmail({
+            to: user.email,
+            subject: 'Account Deletion Confirmation - B4AI',
+            html: `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <style>
+                  body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                  .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                  .header { background-color: #ff3b30; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+                  .content { background-color: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
+                  .summary { background-color: #fee; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ff3b30; }
+                  .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <div class="header">
+                    <h1>Account Deletion Confirmed</h1>
+                  </div>
+                  <div class="content">
+                    <h2>Goodbye ${deletionSummary.name || 'User'},</h2>
+                    
+                    <p>Your B4AI account has been permanently deleted as requested on ${new Date().toLocaleDateString()}.</p>
+                    
+                    <div class="summary">
+                      <h3>📊 Data Summary (Permanently Deleted):</h3>
+                      <ul>
+                        <li>🎯 Quiz attempts: ${deletionSummary.deletedData.quizzesTaken}</li>
+                        <li>❓ Questions answered: ${deletionSummary.deletedData.questionsAnswered}</li>
+                        <li>🏆 BB Points earned: ${deletionSummary.deletedData.bbPointsEarned}</li>
+                        <li>📈 All analytics and performance data</li>
+                        <li>👤 Complete profile information</li>
+                        <li>📅 Account age: ${deletionSummary.deletedData.accountAge}</li>
+                      </ul>
+                    </div>
+                    
+                    <p><strong>This action was permanent and cannot be undone.</strong></p>
+                    
+                    <p>If you created this account again in the future, you will start fresh with no previous data.</p>
+                    
+                    <p>Thank you for using B4AI. We're sorry to see you go!</p>
+                    
+                    <div class="footer">
+                      <p>Best regards,<br>The B4AI Team</p>
+                      <p style="color: #9ca3af; font-size: 12px;">This email confirms the permanent deletion of your account. No further action is required.</p>
+                    </div>
+                  </div>
+                </div>
+              </body>
+              </html>
+            `
+          });
+          console.log('✉️ Deletion confirmation email sent');
+        }
+      } catch (emailError) {
+        // Email failure shouldn't stop the deletion
+        console.error('❌ Failed to send deletion confirmation email:', emailError);
+      }
+
+      res.json({
+        success: true,
+        message: 'Account deleted successfully',
+        deletionSummary: deletionSummary
+      });
+
+    } catch (transactionError) {
+      // Rollback transaction on error
+      await session.abortTransaction();
+      throw transactionError;
+    } finally {
+      session.endSession();
+    }
+
+  } catch (error) {
+    console.error('❌ Delete account error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete account',
+      error: error.message
+    });
+  }
+});
+
 // ✅ ADMIN CREATE USER ENDPOINT WITH EMAIL
 router.post('/admin/create-user', authenticateToken, async (req, res) => {
   try {
@@ -581,7 +801,7 @@ router.put('/users/email/:email', authenticateToken, async (req, res) => {
         '-password -refreshToken -emailVerificationCode -passwordResetCode'
       );
 
-    console.log('✅ User updated successfully by email');
+    console.log(' User updated successfully by email');
 
     res.json({
       success: true,
@@ -598,7 +818,7 @@ router.put('/users/email/:email', authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ GET USER BY EMAIL
+//  GET USER BY EMAIL
 router.get('/users/email/:email', authenticateToken, async (req, res) => {
   try {
     const { email } = req.params;
@@ -623,7 +843,7 @@ router.get('/users/email/:email', authenticateToken, async (req, res) => {
       });
     }
 
-    console.log('✅ User details fetched successfully by email');
+    console.log(' User details fetched successfully by email');
 
     res.json({
       success: true,
@@ -642,7 +862,7 @@ router.get('/users/email/:email', authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ DATABASE INTEGRATED: CHANGE PASSWORD ENDPOINT
+// DATABASE INTEGRATED: CHANGE PASSWORD ENDPOINT
 router.put('/change-password', authenticateToken, async (req, res) => {
   try {
     console.log('🔐 Password change request for user:', req.user?.userId);
@@ -702,7 +922,7 @@ router.put('/change-password', authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ DATABASE INTEGRATED: UPLOAD AVATAR ENDPOINT
+//  DATABASE INTEGRATED: UPLOAD AVATAR ENDPOINT
 router.put('/upload-avatar', authenticateToken, async (req, res) => {
   try {
     console.log('📷 Avatar upload request for user:', req.user?.userId);
@@ -756,9 +976,61 @@ router.put('/upload-avatar', authenticateToken, async (req, res) => {
   }
 });
 
+//  TEST DELETE ACCOUNT ENDPOINT (for testing purposes)
+router.post('/test-delete-account', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    console.log('🧪 TEST: Delete account simulation for user:', userId);
+
+    // Find user
+    const user = await userModel.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Get analytics
+    const analytics = await PerformanceAnalytics.findOne({ userId });
+
+    const simulationResult = {
+      user: {
+        email: user.email,
+        name: `${user.profile?.firstName || ''} ${user.profile?.lastName || ''}`.trim()
+      },
+      dataToBeDeleted: {
+        analyticsRecord: !!analytics,
+        quizzesTaken: analytics?.totalQuizzesTaken || 0,
+        questionsAnswered: analytics?.totalQuestionsAttempted || 0,
+        bbPoints: analytics?.cumulativeScore || 0,
+        accountAge: Math.floor((new Date() - new Date(user.createdAt)) / (1000 * 60 * 60 * 24)) + ' days'
+      },
+      warningMessage: 'This is a simulation. Actual deletion would be permanent and irreversible.'
+    };
+
+    res.json({
+      success: true,
+      message: 'Delete account simulation completed',
+      simulation: simulationResult
+    });
+
+  } catch (error) {
+    console.error('❌ Test delete account error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to simulate account deletion',
+      error: error.message
+    });
+  }
+});
+
 // Protected routes (authentication required) - Your existing routes
 router.get('/profile/:id', authenticateToken, getProfile);
 router.put('/update-profile', authenticateToken, singleUpload, updateProfile);
+
+// Legacy logout route
+router.post('/logout', authenticateToken, logout);
 
 // Test protected route
 router.get('/protected', authenticateToken, (req, res) => {
@@ -772,3 +1044,4 @@ router.get('/protected', authenticateToken, (req, res) => {
 });
 
 export default router;
+//routes/user.route.js
