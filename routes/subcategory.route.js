@@ -1,28 +1,10 @@
 import express from 'express';
 import Subcategory from '../models/subcategoryModel.js';
-
+import {getSubCategories} from "../controllers/sub-categories.controller.js"
 const router = express.Router();
 
 // Get all subcategories
-router.get('/', async (req, res) => {
-  try {
-    const subcategories = await Subcategory.find({}).sort({ name: 1 });
-    
-    res.status(200).json({
-      success: true,
-      message: 'Subcategories fetched successfully',
-      data: subcategories,
-      count: subcategories.length
-    });
-  } catch (error) {
-    console.error('❌ Error fetching subcategories:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch subcategories',
-      error: error.message
-    });
-  }
-});
+router.get('/', getSubCategories);
 
 // Get subcategory by ID
 router.get('/:id', async (req, res) => {

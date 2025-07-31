@@ -6,9 +6,11 @@ import {
   createQuestion,
   updateQuestion,
   deleteQuestion,
+  approveQuestionController,
   bulkUpdateQuestions,
   bulkDeleteQuestions,
-  uploadMiddleware
+  uploadMiddleware,
+  getAllStudentQuestions
 } from '../controllers/questions-controller.js';
 import { authenticateToken } from '../middleware/authMiddleware.js'; // ✅ CORRECT PATH - matches your structure
 
@@ -41,6 +43,7 @@ router.post('/import-excel',
 
 // CRUD routes for questions management
 router.get('/all', authenticateToken, getAllQuestions);
+router.get('/student-questions', authenticateToken, getAllStudentQuestions);
 router.get('/random', getRandomQuestions); // Public route for getting quiz questions
 router.post('/create', authenticateToken, createQuestion);
 router.put('/update/:questionId', authenticateToken, updateQuestion);
@@ -277,42 +280,6 @@ router.get('/search', async (req, res) => {
 });
 
 // Approve/reject questions (admin only)
-router.patch('/approve/:questionId', authenticateToken, async (req, res) => {
-  try {
-    const Questions = (await import('../models/QuestionsModel.js')).default;
-    const { questionId } = req.params;
-    const { approved } = req.body;
-
-    const question = await Questions.findByIdAndUpdate(
-      questionId,
-      { 
-        approved: approved === true,
-        updatedAt: new Date()
-      },
-      { new: true }
-    );
-
-    if (!question) {
-      return res.status(404).json({
-        success: false,
-        message: 'Question not found',
-        code: 'NOT_FOUND'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: `Question ${approved ? 'approved' : 'rejected'} successfully`,
-      question
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update question approval status',
-      error: error.message,
-      code: 'APPROVAL_ERROR'
-    });
-  }
-});
+router.patch('/approve/:questionId', authenticateToken, approveQuestionController);
 
 export default router;

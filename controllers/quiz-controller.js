@@ -167,7 +167,6 @@ const getSmartFallbackWithRandomization = (question) => {
 const addQuestion = async (req, res) => {
   try {
     const { userId, question } = req.body;
-
     // Validation
     if (!userId || !question) {
       return res.status(400).json({

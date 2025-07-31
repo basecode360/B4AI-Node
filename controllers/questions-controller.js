@@ -1,4 +1,6 @@
 import Questions from '../models/QuestionsModel.js';
+import PerformanceAnalytics from '../models/PerformanceAnalytics.js';
+import {userModel} from '../models/userModel.js';
 import XLSX from 'xlsx';
 import multer from 'multer';
 import path from 'path';
@@ -466,7 +468,7 @@ export const importExcelQuestions = async (req, res) => {
 };
 
 // Get all questions with filters
-export const getAllQuestions = async (req, res) => {
+/*export const getAllQuestions = async (req, res) => {
   try {
     const { 
       page = 1, 
@@ -545,7 +547,256 @@ export const getAllQuestions = async (req, res) => {
       code: 'FETCH_ERROR'
     });
   }
+};*/
+// Add these helper functions to your controller file
+
+// 📊 Helper function to get approved question statistics
+const getApprovedQuestionStats = async () => {
+  try {
+    const [
+      totalApproved,
+      totalCategories,
+      totalLanguages,
+      recentlyApproved
+    ] = await Promise.all([
+      Questions.countDocuments({ approved: true }),
+      Questions.distinct('category', { approved: true }),
+      Questions.distinct('language', { approved: true }),
+      Questions.countDocuments({ 
+        approved: true, 
+        createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } 
+      })
+    ]);
+
+    return {
+      approved: totalApproved,
+      categories: totalCategories.filter(Boolean),
+      languages: totalLanguages.filter(Boolean),
+      recentlyApproved,
+      total: totalApproved
+    };
+  } catch (error) {
+    console.error('Error getting approved question stats:', error);
+    return {
+      approved: 0,
+      categories: [],
+      languages: [],
+      recentlyApproved: 0,
+      total: 0
+    };
+  }
 };
+
+// 📊 Helper function to get student question statistics (for unapproved questions)
+const getStudentQuestionStats = async () => {
+  try {
+    const [
+      totalPending,
+      totalCategories,
+      totalLanguages,
+      recentSubmissions,
+      needsReview
+    ] = await Promise.all([
+      Questions.countDocuments({ approved: false }),
+      Questions.distinct('category', { approved: false }),
+      Questions.distinct('language', { approved: false }),
+      Questions.countDocuments({ 
+        approved: false, 
+        createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24 hours
+      }),
+      Questions.countDocuments({ 
+        approved: false, 
+        moderationStatus: 'needs_review' 
+      })
+    ]);
+
+    return {
+      pending: totalPending,
+      categories: totalCategories.filter(Boolean),
+      languages: totalLanguages.filter(Boolean),
+      recentSubmissions,
+      needsReview,
+      total: totalPending
+    };
+  } catch (error) {
+    console.error('Error getting student question stats:', error);
+    return {
+      pending: 0,
+      categories: [],
+      languages: [],
+      recentSubmissions: 0,
+      needsReview: 0,
+      total: 0
+    };
+  }
+};
+
+// Fixed getAllStudentQuestions function
+export const getAllStudentQuestions = async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 20, 
+      language = 'all', 
+      category = 'all',
+      status = 'all',
+      search = ''
+    } = req.query;
+
+    // Build filter object - ALWAYS filter for non-approved questions only
+    const filter = {
+      approved: false // for all the unapproved questions
+    };
+    
+    if (language !== 'all') {
+      filter.language = language;
+    }
+    
+    if (category !== 'all') {
+      filter.category = new RegExp(category, 'i');
+    }
+    
+    if (status !== 'all') {
+      filter.status = status;
+    }
+    
+    if (search) {
+      filter.$or = [
+        { question: new RegExp(search, 'i') },
+        { category: new RegExp(search, 'i') },
+        { subCategory: new RegExp(search, 'i') }
+      ];
+    }
+
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Get questions with pagination
+    const questions = await Questions.find(filter)
+    .populate({
+      path: 'creator',
+      select: 'name email role',
+      populate: {
+        path: 'profile',
+        select: 'firstName lastName profilePic'
+      }
+    })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(parseInt(limit));
+
+    // Get total count for non-approved questions only
+    const total = await Questions.countDocuments(filter);
+
+    // 📊 Add stats for student questions (FIXED: Use correct function)
+    const stats = await getStudentQuestionStats();
+
+    res.status(200).json({
+      success: true,
+      questions,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalQuestions: total,
+        limit: parseInt(limit)
+      },
+      stats // Include stats about student questions
+    });
+
+  } catch (error) {
+    console.error('❌ Get student questions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch student questions',
+      error: error.message,
+      code: 'STUDENT_QUESTIONS_FETCH_ERROR'
+    });
+  }
+};
+
+// Fixed getAllQuestions function (for approved questions)
+export const getAllQuestions = async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 20, 
+      language = 'all', 
+      category = 'all',
+      status = 'all',
+      search = ''
+    } = req.query;
+
+    // Build filter object - ALWAYS filter for approved questions only
+    const filter = {
+      approved: true // 🔥 KEY CHANGE: Only return approved questions
+    };
+    
+    if (language !== 'all') {
+      filter.language = language;
+    }
+    
+    if (category !== 'all') {
+      filter.category = new RegExp(category, 'i');
+    }
+    
+    if (status !== 'all') {
+      filter.status = status;
+    }
+    
+    if (search) {
+      filter.$or = [
+        { question: new RegExp(search, 'i') },
+        { category: new RegExp(search, 'i') },
+        { subCategory: new RegExp(search, 'i') }
+      ];
+    }
+
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Get questions with pagination
+    const questions = await Questions.find(filter)
+    .populate({
+      path: 'creator',
+      select: 'name email role',
+      populate: {
+        path: 'profile',
+        select: 'firstName lastName profilePic'
+      }
+    })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(parseInt(limit));
+
+    // Get total count for approved questions only
+    const total = await Questions.countDocuments(filter);
+
+    // 📊 Add stats for approved questions
+    const stats = await getApprovedQuestionStats();
+
+    res.status(200).json({
+      success: true,
+      questions,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalQuestions: total,
+        limit: parseInt(limit)
+      },
+      stats // Include stats about approved questions
+    });
+
+  } catch (error) {
+    console.error('❌ Get approved questions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch approved questions',
+      error: error.message,
+      code: 'APPROVED_QUESTIONS_FETCH_ERROR'
+    });
+  }
+};
+
 
 // Get random questions for quiz
 export const getRandomQuestions = async (req, res) => {
@@ -612,36 +863,51 @@ export const createQuestion = async (req, res) => {
   try {
     const questionData = {
       ...req.body,
-      creator: req.user.userId,
+      creator: req.user.userId,  
       importSource: 'manual_entry',
-      // Don't override approved if it's provided in the request
-      approved: req.body.approved === true
+      approved: req.body.approved === true,
     };
 
     const newQuestion = new Questions(questionData);
     await newQuestion.save();
 
-    // Populate creator info
+    
+      
+    // 3. Check if the user is not an admin (i.e., user can be a student or any non-admin role)
+    //if (req.user.role !== "admin") {
+      let performanceAnalytics = await PerformanceAnalytics.findOne({ userId: req.user.userId });
+
+      if (!performanceAnalytics) {
+        performanceAnalytics = new PerformanceAnalytics({
+          userId: req.user.userId,
+          cumulativeScore: 1, 
+        });
+      } else {
+        performanceAnalytics.cumulativeScore += 1;
+      }
+
+      await performanceAnalytics.save();
+   // }
+    
     await newQuestion.populate('creator', 'name email role');
 
     console.log(`✅ Created question with approved=${newQuestion.approved}`);
-
     res.status(201).json({
       success: true,
       message: 'Question created successfully',
-      question: newQuestion
+      question: newQuestion,
     });
-
   } catch (error) {
     console.error('❌ Create question error:', error);
     res.status(400).json({
       success: false,
       message: 'Failed to create question',
       error: error.message,
-      code: 'CREATE_ERROR'
+      code: 'CREATE_ERROR',
     });
   }
 };
+
 
 // Update question
 export const updateQuestion = async (req, res) => {
@@ -778,6 +1044,78 @@ export const bulkDeleteQuestions = async (req, res) => {
     });
   }
 };
+
+// Function to approve the question and update points for the student
+export const approveQuestionController = async (req, res) => {
+  try {
+    const Questions = (await import('../models/QuestionsModel.js')).default;
+    const { questionId } = req.params;
+    const { approved } = req.body;
+
+    // Update the question's approved status
+    const question = await Questions.findByIdAndUpdate(
+      questionId,
+      { 
+        approved: approved === true,
+        updatedAt: new Date()
+      },
+      { new: true }
+    );
+
+    if (!question) {
+      return res.status(404).json({
+        success: false,
+        message: 'Question not found',
+        code: 'NOT_FOUND'
+      });
+    }
+
+    // If the question is approved, update the student's cumulative score
+    if (approved === true) {
+      // Find the student who created the question
+      const student = await userModel.findById(question.creator);
+
+      if (!student) {
+        return res.status(404).json({
+          success: false,
+          message: 'Student not found',
+          code: 'STUDENT_NOT_FOUND'
+        });
+      }
+
+      // Find the student's performance analytics
+      let performanceAnalytics = await PerformanceAnalytics.findOne({ userId: student._id });
+
+      if (!performanceAnalytics) {
+        // If the student doesn't have performance analytics, create a new record
+        performanceAnalytics = new PerformanceAnalytics({
+          userId: student._id,
+          cumulativeScore: 10,  // Add 10 points upon approval (starting from 1)
+        });
+      } else {
+        // If the student already has performance analytics, update the cumulative score
+        performanceAnalytics.cumulativeScore += 10; // Add 10 points
+      }
+
+      // Save the updated performance analytics
+      await performanceAnalytics.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Question ${approved ? 'approved' : 'rejected'} successfully`,
+      question
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update question approval status',
+      error: error.message,
+      code: 'APPROVAL_ERROR'
+    });
+  }
+}
+
 
 // Export the upload middleware
 export const uploadMiddleware = upload.single('file');

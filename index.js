@@ -145,6 +145,7 @@ app.get('/', (req, res) => {
       '/api/v1/auth - Authentication routes',
       '/api/v1/quiz - Quiz management routes with language support',
       '/api/v1/questions - Questions management and import routes',
+      '/api/v1/questions',
       '/api/v1/analytics - Analytics and performance routes',
     ],
     // ✅ New language support info

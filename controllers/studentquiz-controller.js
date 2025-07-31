@@ -6,39 +6,36 @@ export const addQuestion = async (req, res) => {
   try {
     // 🐛 DEBUG: Log collection info
     
-    // Validation errors check karo
+    // Validation errors check
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
-        errors: errors.array()
+        errors: errors.array(),
       });
     }
 
     const {
       question,
       answers,
-      options, // Also check for 'options' field
+      options, // Use options field
+      correctAnswer, 
       correctAnswerIndex,
-      correctAnswer, // Also check for 'correctAnswer' field
       category,
       subCategory,
       language,
       difficulty,
-      tags
+      tags,
+      quizId, // New field for quizId (required)
     } = req.body;
 
-   
-
-    
-    // User ID token se nikalo (middleware se aayega) - Fixed to match your middleware
+    // User ID token extraction (middleware)
     const userId = req.user?.userId || req.user?.id || req.user?._id;
-    
     if (!userId) {
       return res.status(401).json({
         success: false,
-        message: 'User authentication failed - no userId found'
+        message: 'User authentication failed - no userId found',
       });
     }
 
@@ -50,27 +47,36 @@ export const addQuestion = async (req, res) => {
     if (!question || !finalAnswers || finalAnswers.length !== 4) {
       return res.status(400).json({
         success: false,
-        message: 'Question and 4 answers are required'
+        message: 'Question and 4 answers are required',
       });
     }
 
     if (finalCorrectIndex < 0 || finalCorrectIndex > 3) {
       return res.status(400).json({
         success: false,
-        message: 'Correct answer index must be between 0-3'
+        message: 'Correct answer index must be between 0-3',
       });
     }
 
     if (!category || !subCategory) {
       return res.status(400).json({
         success: false,
-        message: 'Category and sub-category are required'
+        message: 'Category and sub-category are required',
       });
     }
 
-    // New question object banao
+    // Ensure quizId is provided
+    if (!quizId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Quiz ID is required',
+      });
+    }
+
+    // New question object
     const questionData = {
       userId: userId,
+      quizId: quizId, // New field for quizId
       question: question.trim(),
       options: finalAnswers.map(answer => answer.trim()),
       correctAnswer: finalCorrectIndex,
@@ -79,20 +85,17 @@ export const addQuestion = async (req, res) => {
       language: language || 'english',
       difficulty: difficulty || 'medium',
       tags: tags || [],
-      status: 'pending', // Updated to match your schema
-      submissionSource: 'web_app' // Added required field
+      status: 'pending', // Status as 'pending' by default
+      submissionSource: 'web_app', // Submission source
     };
 
-
+    // Create a new question document
     const newQuestion = new StudentQuiz(questionData);
 
-    
-    // Database mein save karo
+    // Save the question to the database
     const savedQuestion = await newQuestion.save();
 
-   
-
-    // Success response bhejo
+    // Success response
     res.status(201).json({
       success: true,
       message: 'Question added successfully',
@@ -103,21 +106,20 @@ export const addQuestion = async (req, res) => {
         subCategory: savedQuestion.subCategory,
         language: savedQuestion.language,
         status: savedQuestion.status,
-        createdAt: savedQuestion.createdAt
-      }
+        createdAt: savedQuestion.createdAt,
+      },
     });
-
   } catch (error) {
     console.error('❌ Error adding question:', error);
     console.error('🔍 Error details:', {
       message: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
-    
+
     res.status(500).json({
       success: false,
       message: 'Internal server error',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };

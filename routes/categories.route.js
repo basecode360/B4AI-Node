@@ -1,28 +1,11 @@
 import express from 'express';
 import Category from '../models/categoriesModel.js';
-
+import {getCategories} from "../controllers/categorie.controller.js";
 const router = express.Router();
 
 // Get all categories
-router.get('/', async (req, res) => {
-  try {
-    const categories = await Category.find({}).sort({ name: 1 });
-    
-    res.status(200).json({
-      success: true,
-      message: 'Categories fetched successfully',
-      data: categories,
-      count: categories.length
-    });
-  } catch (error) {
-    console.error('❌ Error fetching categories:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch categories',
-      error: error.message
-    });
-  }
-});
+router.get('/',getCategories);
+ 
 
 // Get category by ID
 router.get('/:id', async (req, res) => {
