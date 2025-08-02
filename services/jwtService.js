@@ -19,7 +19,7 @@ class JWTService {
       },
       secret,
       {
-        expiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN || '15m',
+        expiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN || '15m', // ✅ FIXED: Now uses env variable
         issuer: 'boardbullets-auth',
         audience: 'boardbullets-api',
       }

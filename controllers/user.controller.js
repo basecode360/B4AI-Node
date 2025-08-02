@@ -296,11 +296,12 @@ const verifyEmail = async (req, res) => {
     // Delete verification entry after successful verification
     await schemaForVerify.deleteOne({ _id: verification._id });
 
-    // Generate JWT token
-    const tokenData = { userId: user._id };
-    const token = jwt.sign(tokenData, process.env.JWT_SECRET, {
-      expiresIn: '1d',
-    });
+     // Generate JWT token
+     const tokenData = { userId: user._id };
+     const token = jwt.sign(tokenData, process.env.JWT_SECRET, {
+       expiresIn: '1m',
+     });
+    
 
     // Remove password from response
     const userResponse = {
@@ -387,77 +388,6 @@ const resendVerificationCode = async (req, res) => {
   }
 };
 
-// Login API
-const login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // Validation
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email and password are required',
-      });
-    }
-
-    // Validate email format
-    if (!isValidEmail(email)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide a valid email address',
-      });
-    }
-
-    // Find user by email
-    const user = await userModel.findOne({ email: email.toLowerCase() });
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid email or password',
-      });
-    }
-
-    // Compare password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid email or password',
-      });
-    }
-
-    // Remove password from response
-    const userResponse = {
-      _id: user._id,
-      email: user.email,
-      role: user.role,
-      profile: user.profile,
-      createdAt: user.createdAt,
-    };
-
-    const tokenData = {
-      userId: user?._id,
-    };
-
-    const token = jwt.sign(tokenData, process.env.JWT_SECRET, {
-      expiresIn: '1d',
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: 'login successfully',
-      token,
-    });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error during login',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
-    });
-  }
-};
-
 // Enhanced Login API
 // Helper function to set secure session cookie
 const setSessionCookie = (res, sessionId) => {
@@ -489,7 +419,7 @@ const clearSessionCookie = (res) => {
  */
 const loginEnhanced = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body; // Removed rememberMe for now
 
     // Validation
     if (!email || !password) {
@@ -533,7 +463,7 @@ const loginEnhanced = async (req, res) => {
     const userAgent = req.headers['user-agent'] || '';
     const ipAddress = req.ip || req.connection.remoteAddress || '';
 
-    // Create new session (sliding window)
+    // Create new session (your existing method works fine)
     const session = await SessionService.createSession(
       user._id,
       userAgent,
@@ -544,7 +474,7 @@ const loginEnhanced = async (req, res) => {
     user.lastLogin = new Date();
     await user.save();
 
-    // Generate short-lived access token
+    // Generate short-lived access token (15 minutes)
     const tokenPayload = {
       userId: user._id,
       email: user.email,
@@ -587,7 +517,6 @@ const loginEnhanced = async (req, res) => {
     });
   }
 };
-
 /**
  * NEW: REFRESH TOKEN ENDPOINT
  */
@@ -1212,7 +1141,6 @@ export {
   verifyResetCode,
   resetPassword,
   // Keep existing login/logout for backward compatibility if needed
-  login, // Original login function
   logout, // Original logout function
   setSessionCookie, // Helper function
   clearSessionCookie, // Helper function

@@ -2,10 +2,11 @@ import express from 'express';
 import {
   authenticateToken,
   extractSessionId,
+  sessionOnlyAuth
 } from '../middleware/authMiddleware.js'; // 🆕 Add extractSessionId
+
 import {
   getProfile,
-  login,
   logout,
   register,
   resendVerificationCode,
@@ -23,7 +24,6 @@ import {
 import { singleUpload } from '../middleware/multer.js';
 import { userModel } from '../models/userModel.js';
 import PerformanceAnalytics from '../models/PerformanceAnalytics.js'; // 🆕 Import for cleanup
-import { Quiz } from '../models/quizModel.js'; // 🆕 Import for cleanup
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs'; // Add this import
 import { sendEmail } from '../utils/emailService.js'; // Add this import
@@ -42,8 +42,8 @@ router.post('/reset-password', resetPassword);
 
 // Enhanced authentication routes (with session management)
 router.post('/login-enhanced', loginEnhanced); // New enhanced login
-router.post('/refresh', extractSessionId, refreshToken); // New refresh endpoint
-router.post('/logout-enhanced', extractSessionId, logoutEnhanced); // New enhanced logout
+router.post('/refresh', sessionOnlyAuth, refreshToken); // New refresh endpoint
+router.post('/logout-enhanced', sessionOnlyAuth, logoutEnhanced); // New enhanced logout
 
 // Session management routes
 router.post('/revoke-all', authenticateToken, revokeAllSessions);

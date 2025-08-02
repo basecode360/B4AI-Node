@@ -1,11 +1,13 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Session } from '../models/sessionModel.js';
+import bcrypt from 'bcryptjs';
 
 class SessionService {
   /**
    * Create a new session for a user
+   * Now supports storing encrypted credentials for auto-renewal
    */
-  static async createSession(userId, userAgent = '', ipAddress = '') {
+  static async createSession(userId, userAgent = '', ipAddress = '', options = {}) {
     const sessionTTLDays = parseInt(process.env.SESSION_TTL_DAYS || '7');
     const expireAt = new Date(
       Date.now() + sessionTTLDays * 24 * 60 * 60 * 1000
@@ -24,6 +26,12 @@ class SessionService {
         // If found, update expiry and return
         session.expireAt = expireAt;
         session.lastAccessed = new Date();
+        
+        // Update credentials if provided
+        if (options.userCredentials && options.storeCredentials) {
+          session.setEncryptedCredentials(options.userCredentials);
+        }
+        
         await session.save();
         console.log(
           `🔄 Reusing active session for user ${userId}: ${session.sessionId} (new expiry: ${expireAt})`
@@ -33,14 +41,23 @@ class SessionService {
 
       // Otherwise, create a new session
       const sessionId = uuidv4();
-      session = await Session.create({
+      session = new Session({
         sessionId,
         userId,
         expireAt,
         userAgent,
         ipAddress,
         deviceInfo: SessionService.parseUserAgent(userAgent),
+        authMethod: options.authMethod || 'password',
+        autoRenewEnabled: options.autoRenewEnabled !== false,
       });
+
+      // Store encrypted credentials if provided
+      if (options.userCredentials && options.storeCredentials) {
+        session.setEncryptedCredentials(options.userCredentials);
+      }
+
+      await session.save();
 
       console.log(
         `📝 Session created for user ${userId}: ${sessionId} (expires: ${expireAt})`
@@ -70,9 +87,9 @@ class SessionService {
   }
 
   /**
-   * Refresh a session (sliding window)
+   * Enhanced refresh session with auto-authentication capability
    */
-  static async refreshSession(sessionId) {
+  static async refreshSession(sessionId, options = {}) {
     const sessionTTLDays = parseInt(process.env.SESSION_TTL_DAYS || '7');
     const newExpireAt = new Date(
       Date.now() + sessionTTLDays * 24 * 60 * 60 * 1000
@@ -100,6 +117,61 @@ class SessionService {
       return session;
     } catch (error) {
       console.error('❌ Session refresh failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * NEW: Attempt auto-authentication using stored credentials
+   */
+  static async attemptAutoAuth(sessionId) {
+    try {
+      const session = await Session.findOne({
+        sessionId,
+        autoRenewEnabled: true,
+        expireAt: { $gt: new Date() },
+      }).populate('userId', '-password');
+
+      if (!session || !session.encryptedCredentials) {
+        console.log('🔴 No auto-auth data available for session:', sessionId);
+        return null;
+      }
+
+      // Decrypt stored credentials
+      const credentials = session.getDecryptedCredentials();
+      if (!credentials || !credentials.email || !credentials.hashedPassword) {
+        console.log('🔴 Invalid credentials in session:', sessionId);
+        return null;
+      }
+
+      // Verify user still exists and is active
+      const user = session.userId;
+      if (!user || !user.isVerified) {
+        console.log('🔴 User not found or not verified for auto-auth');
+        return null;
+      }
+
+      // Verify the stored password hash matches current user password
+      if (user.password !== credentials.hashedPassword) {
+        console.log('🔴 Stored password hash mismatch - password was changed');
+        // Clear invalid credentials
+        session.encryptedCredentials = null;
+        await session.save();
+        return null;
+      }
+
+      console.log('✅ Auto-authentication successful for user:', user.email);
+      
+      // Refresh session
+      await SessionService.refreshSession(sessionId);
+      
+      return {
+        user,
+        session,
+        method: 'auto-auth'
+      };
+    } catch (error) {
+      console.error('❌ Auto-authentication failed:', error);
       return null;
     }
   }
@@ -167,6 +239,12 @@ class SessionService {
       os = 'Android';
     } else if (/iphone|ipad|ipod/i.test(userAgent)) {
       os = 'iOS';
+    } else if (/windows/i.test(userAgent)) {
+      os = 'Windows';
+    } else if (/mac os/i.test(userAgent)) {
+      os = 'macOS';
+    } else if (/linux/i.test(userAgent)) {
+      os = 'Linux';
     }
 
     // Improved platform detection for mobile apps (Expo, React Native, etc.)
