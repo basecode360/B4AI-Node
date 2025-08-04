@@ -1041,5 +1041,121 @@ router.get('/protected', authenticateToken, (req, res) => {
   });
 });
 
+// Free usage limits endpoint
+router.get('/free-usage-limits', authenticateToken, async (req, res) => {
+  try {
+    const user = await userModel.findById(req.user.userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Initialize freeQuizUsage if not exists
+    if (!user.freeQuizUsage) {
+      user.freeQuizUsage = {
+        totalQuestionsUsed: 0,
+        questionsUsedByMode: { TIMED: 0, UNTIMED: 0, 'ON-THE-GO': 0 },
+        questionsUsedByLanguage: new Map(),
+        lastResetDate: new Date(),
+        usageHistory: []
+      };
+      await user.save();
+    }
+
+    res.json({
+      success: true,
+      usage: {
+        totalQuestionsUsed: user.freeQuizUsage.totalQuestionsUsed || 0,
+        questionsUsedByMode: user.freeQuizUsage.questionsUsedByMode || { TIMED: 0, UNTIMED: 0, 'ON-THE-GO': 0 },
+        questionsUsedByLanguage: Object.fromEntries(user.freeQuizUsage.questionsUsedByLanguage || new Map()),
+        lastResetDate: user.freeQuizUsage.lastResetDate || new Date().toDateString()
+      }
+    });
+  } catch (error) {
+    console.error('❌ Get free usage error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to get usage limits',
+      error: error.message 
+    });
+  }
+});
+
+// Update free usage - WITH AUTH
+router.post('/update-free-usage', authenticateToken, async (req, res) => {
+  try {
+    const { questionsAnswered, mode, language, timestamp } = req.body;
+    const userId = req.user.userId;
+
+    console.log(`📈 Updating usage for user ${userId}: +${questionsAnswered} questions in ${mode} mode (${language})`);
+
+    const user = await userModel.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Initialize if not exists
+    if (!user.freeQuizUsage) {
+      user.freeQuizUsage = {
+        totalQuestionsUsed: 0,
+        questionsUsedByMode: { TIMED: 0, UNTIMED: 0, 'ON-THE-GO': 0 },
+        questionsUsedByLanguage: new Map(),
+        lastResetDate: new Date(),
+        usageHistory: []
+      };
+    }
+
+    // Update totals
+    user.freeQuizUsage.totalQuestionsUsed += questionsAnswered;
+    user.freeQuizUsage.questionsUsedByMode[mode] = (user.freeQuizUsage.questionsUsedByMode[mode] || 0) + questionsAnswered;
+    
+    // Update language usage
+    const currentLangUsage = user.freeQuizUsage.questionsUsedByLanguage.get(language) || 0;
+    user.freeQuizUsage.questionsUsedByLanguage.set(language, currentLangUsage + questionsAnswered);
+
+    // Add to history for analytics
+    user.freeQuizUsage.usageHistory.push({
+      date: new Date(timestamp || Date.now()),
+      questionsUsed: questionsAnswered,
+      mode,
+      language
+    });
+
+    // Keep only last 100 history entries to avoid bloat
+    if (user.freeQuizUsage.usageHistory.length > 100) {
+      user.freeQuizUsage.usageHistory = user.freeQuizUsage.usageHistory.slice(-100);
+    }
+
+    await user.save();
+
+    console.log(`✅ Usage updated: ${user.freeQuizUsage.totalQuestionsUsed}/60 total used`);
+
+    res.json({
+      success: true,
+      message: 'Usage updated successfully',
+      usage: {
+        totalQuestionsUsed: user.freeQuizUsage.totalQuestionsUsed,
+        questionsUsedByMode: user.freeQuizUsage.questionsUsedByMode,
+        questionsUsedByLanguage: Object.fromEntries(user.freeQuizUsage.questionsUsedByLanguage),
+        lastResetDate: user.freeQuizUsage.lastResetDate
+      }
+    });
+  } catch (error) {
+    console.error('❌ Update usage error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to update usage',
+      error: error.message 
+    });
+  }
+});
+
 export default router;
 //routes/user.route.js
