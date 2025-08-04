@@ -1,10 +1,8 @@
 import express from 'express';
 import {
   authenticateToken,
-  extractSessionId,
   sessionOnlyAuth
-} from '../middleware/authMiddleware.js'; // 🆕 Add extractSessionId
-
+} from '../middleware/authMiddleware.js'; 
 import {
   getProfile,
   logout,

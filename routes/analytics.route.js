@@ -416,16 +416,7 @@ function calculateDataCompleteness(analytics) {
 router.get('/admin/all-stats', authenticateToken, async (req, res) => {
   try {
     console.log('🔧 Admin all stats request');
-    console.log('👤 Requested by user:', req.user?.userId);
-    
-    // TODO: Add admin role check here
-    // const requestingUser = await userModel.findById(req.user.userId);
-    // if (requestingUser.role !== 'admin') {
-    //   return res.status(403).json({
-    //     success: false,
-    //     message: 'Access denied. Admin only.'
-    //   });
-    // }
+    console.log('👤 Requested by user:', req.user?.userId || 'No auth');
     
     // Pagination parameters
     const page = parseInt(req.query.page) || 1;
@@ -451,38 +442,40 @@ router.get('/admin/all-stats', authenticateToken, async (req, res) => {
       .limit(limit)
       .lean();
     
-    console.log(` Found ${analytics.length} analytics records`);
+    console.log(`📊 Found ${analytics.length} analytics records`);
     
     // Transform data for admin dashboard
     const transformedAnalytics = analytics.map(analytic => ({
       _id: analytic._id,
       user: analytic.userId ? {
         _id: analytic.userId._id,
-        email: analytic.userId.email,
-        name: `${analytic.userId.profile?.firstName || ''} ${analytic.userId.profile?.lastName || ''}`.trim() || 'No Name',
-        role: analytic.userId.role,
-        isVerified: analytic.userId.isVerified,
+        email: analytic.userId.email || 'No email',
+        name: analytic.userId.profile ? 
+          `${analytic.userId.profile.firstName || ''} ${analytic.userId.profile.lastName || ''}`.trim() || 'No Name' 
+          : 'No Name',
+        role: analytic.userId.role || 'high_school',
+        isVerified: analytic.userId.isVerified || false,
         joinedAt: analytic.userId.createdAt
       } : null,
       
-      //  ALL DASHBOARD REQUIREMENTS FOR ADMIN (7 points)
-      totalQuizzesTaken: analytic.totalQuizzesTaken,
-      totalQuestionsAttempted: analytic.totalQuestionsAttempted,
-      totalCorrectQuestions: analytic.totalCorrectQuestions,
-      accuracyPercentage: analytic.accuracyPercentage,
-      cumulativeScore: analytic.cumulativeScore,
-      lastQuizScore: analytic.lastQuizScore || 0, // 🆕
-      totalBBPoints: analytic.totalBBPoints || analytic.cumulativeScore, // 🆕
+      // ALL DASHBOARD REQUIREMENTS FOR ADMIN (7 points)
+      totalQuizzesTaken: analytic.totalQuizzesTaken || 0,
+      totalQuestionsAttempted: analytic.totalQuestionsAttempted || 0,
+      totalCorrectQuestions: analytic.totalCorrectQuestions || 0,
+      accuracyPercentage: analytic.accuracyPercentage || 0,
+      cumulativeScore: analytic.cumulativeScore || 0,
+      lastQuizScore: analytic.lastQuizScore || 0,
+      totalBBPoints: analytic.totalBBPoints || analytic.cumulativeScore || 0,
       
       // Enhanced admin data
-      quizCountByMode: analytic.quizCountByMode,
-      timeStats: analytic.timeStats,
-      timePerQuestionStats: analytic.timePerQuestionStats,
-      categoryPerformance: analytic.categoryPerformance ? 
-        Object.fromEntries(analytic.categoryPerformance) : {},
-      performanceTrendsCount: analytic.performanceTrends ? analytic.performanceTrends.length : 0,
-      difficultyPerformance: analytic.difficultyPerformance,
-      lastQuiz: analytic.lastQuiz,
+      quizCountByMode: analytic.quizCountByMode || {},
+      timeStats: analytic.timeStats || {},
+      timePerQuestionStats: analytic.timePerQuestionStats || {},
+      categoryPerformance: analytic.categoryPerformance || {},
+      performanceTrendsCount: Array.isArray(analytic.performanceTrends) ? 
+        analytic.performanceTrends.length : 0,
+      difficultyPerformance: analytic.difficultyPerformance || {},
+      lastQuiz: analytic.lastQuiz || null,
       lastUpdated: analytic.lastUpdated,
       createdAt: analytic.createdAt
     }));
@@ -501,6 +494,7 @@ router.get('/admin/all-stats', authenticateToken, async (req, res) => {
     
   } catch (error) {
     console.error('❌ Get all stats error:', error);
+    console.error('Error stack:', error.stack);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve analytics',

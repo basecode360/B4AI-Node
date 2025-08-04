@@ -152,7 +152,6 @@ const authenticateToken = async (req, res, next) => {
 
 /**
  * Middleware specifically for session-only authentication (e.g., refresh token endpoint)
- * This is your existing extractSessionId but enhanced
  */
 const sessionOnlyAuth = async (req, res, next) => {
   try {
@@ -203,28 +202,4 @@ const sessionOnlyAuth = async (req, res, next) => {
   }
 };
 
-/**
- * Your original extractSessionId function - kept for backward compatibility
- */
-const extractSessionId = (req, res, next) => {
-  // Try to get session ID from cookie (web clients)
-  let sessionId = req.cookies?.session_id;
-
-  // If not in cookies, try request body (mobile clients)
-  if (!sessionId && req.body?.sessionId) {
-    sessionId = req.body.sessionId;
-  }
-
-  if (!sessionId) {
-    return res.status(401).json({
-      success: false,
-      message: 'Session ID required',
-      code: 'SESSION_REQUIRED',
-    });
-  }
-
-  req.sessionId = sessionId;
-  next();
-};
-
-export { authenticateToken, sessionOnlyAuth, extractSessionId };
+export { authenticateToken, sessionOnlyAuth };
