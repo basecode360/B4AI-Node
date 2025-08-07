@@ -5,7 +5,6 @@ import {
 } from '../middleware/authMiddleware.js'; 
 import {
   getProfile,
-  logout,
   register,
   resendVerificationCode,
   updateProfile,
@@ -18,6 +17,8 @@ import {
   logoutEnhanced, // 🆕 Enhanced logout
   revokeAllSessions, // 🆕 Revoke all sessions
   getUserSessions, // 🆕 Get user sessions
+
+
 } from '../controllers/user.controller.js';
 import { singleUpload } from '../middleware/multer.js';
 import { userModel } from '../models/userModel.js';
@@ -27,7 +28,6 @@ import bcrypt from 'bcryptjs'; // Add this import
 import { sendEmail } from '../utils/emailService.js'; // Add this import
 
 const router = express.Router();
-
 // Public routes (no authentication required)
 router.post('/register', register);
 router.post('/verify-email', verifyEmail);
@@ -41,7 +41,7 @@ router.post('/reset-password', resetPassword);
 // Enhanced authentication routes (with session management)
 router.post('/login-enhanced', loginEnhanced); // New enhanced login
 router.post('/refresh', sessionOnlyAuth, refreshToken); // New refresh endpoint
-router.post('/logout-enhanced', sessionOnlyAuth, logoutEnhanced); // New enhanced logout
+router.post('/logout-enhanced', logoutEnhanced); // New enhanced logout
 
 // Session management routes
 router.post('/revoke-all', authenticateToken, revokeAllSessions);
@@ -611,12 +611,12 @@ router.delete('/users/email/:email', authenticateToken, async (req, res) => {
     });
 
     // Prevent deleting admin users (optional)
-    if (userToDelete.role === 'admin') {
+    /*if (userToDelete.role === 'admin') {
       return res.status(403).json({
         success: false,
         message: 'Cannot delete admin users',
       });
-    }
+    }*/
 
     // Prevent users from deleting themselves
     if (userToDelete._id.toString() === req.user.userId) {
@@ -1027,8 +1027,7 @@ router.post('/test-delete-account', authenticateToken, async (req, res) => {
 router.get('/profile/:id', authenticateToken, getProfile);
 router.put('/update-profile', authenticateToken, singleUpload, updateProfile);
 
-// Legacy logout route
-router.post('/logout', authenticateToken, logout);
+
 
 // Test protected route
 router.get('/protected', authenticateToken, (req, res) => {

@@ -296,12 +296,12 @@ const verifyEmail = async (req, res) => {
     // Delete verification entry after successful verification
     await schemaForVerify.deleteOne({ _id: verification._id });
 
-     // Generate JWT token
-     const tokenData = { userId: user._id };
-     const token = jwt.sign(tokenData, process.env.JWT_SECRET, {
-       expiresIn: '1m',
-     });
-    
+    // Generate JWT token
+    const tokenData = { userId: user._id };
+    const token = jwt.sign(tokenData, process.env.JWT_SECRET, {
+      expiresIn: '1m',
+    });
+
 
     // Remove password from response
     const userResponse = {
@@ -419,7 +419,7 @@ const clearSessionCookie = (res) => {
  */
 const loginEnhanced = async (req, res) => {
   try {
-    const { email, password } = req.body; // Removed rememberMe for now
+    const { email, password } = req.body;
 
     // Validation
     if (!email || !password) {
@@ -437,10 +437,9 @@ const loginEnhanced = async (req, res) => {
       });
     }
 
-    // Find user by email (must be verified)
+    // Find user by email (regardless of verification status)
     const user = await userModel.findOne({
       email: email.toLowerCase(),
-      isVerified: true,
     });
 
     if (!user) {
@@ -463,18 +462,19 @@ const loginEnhanced = async (req, res) => {
     const userAgent = req.headers['user-agent'] || '';
     const ipAddress = req.ip || req.connection.remoteAddress || '';
 
-    // Create new session (your existing method works fine)
+    // Create new session
     const session = await SessionService.createSession(
       user._id,
       userAgent,
       ipAddress
     );
 
-    // Update user's last login
+    // Update user's last login AND set isVerified to true
     user.lastLogin = new Date();
+    user.isVerified = true; // ✅ Set to true on login
     await user.save();
 
-    // Generate short-lived access token (15 minutes)
+    // Generate access token
     const tokenPayload = {
       userId: user._id,
       email: user.email,
@@ -484,10 +484,10 @@ const loginEnhanced = async (req, res) => {
 
     const accessToken = JWTService.generateAccessToken(tokenPayload);
 
-    // Set session cookie (for web clients)
+    // Set session cookie
     setSessionCookie(res, session.sessionId);
 
-    // Prepare user response (remove sensitive data)
+    // Prepare user response
     const userResponse = {
       _id: user._id,
       email: user.email,
@@ -495,9 +495,10 @@ const loginEnhanced = async (req, res) => {
       profile: user.profile,
       lastLogin: user.lastLogin,
       createdAt: user.createdAt,
+      isVerified: user.isVerified, // Will be true
     };
 
-    console.log(`✅ Enhanced login successful for user: ${user.email}`);
+    console.log(`✅ Enhanced login successful for user: ${user.email}, isVerified set to true`);
 
     return res.status(200).json({
       success: true,
@@ -569,29 +570,133 @@ const refreshToken = async (req, res) => {
   }
 };
 
-/**
- * ENHANCED LOGOUT - Now deletes session
- */
 const logoutEnhanced = async (req, res) => {
+  // Add timestamp to match your console format
+  const timestamp = new Date().toISOString();
+  console.log(`${timestamp} - POST /api/v1/auth/logout-enhanced`);
+  console.log('🚀 LOGOUT ENHANCED FUNCTION CALLED');
+  
   try {
-    const sessionId = req.sessionId || req.cookies?.session_id;
+    // Log all possible sources of sessionId
+    console.log('🔍 Debug - req.body:', JSON.stringify(req.body, null, 2));
+    console.log('🔍 Debug - req.sessionId:', req.sessionId);
+    console.log('🔍 Debug - req.cookies:', req.cookies);
+    console.log('🔍 Debug - req.headers:', JSON.stringify(req.headers, null, 2));
+    
+    // Get sessionId from request body (sent from frontend) or fallback to other sources
+    const sessionId = req.body.sessionId || req.sessionId || req.cookies?.session_id;
+    
+    console.log('🔍 Logout attempt with sessionId:', sessionId);
 
-    if (sessionId) {
-      const deleted = await SessionService.deleteSession(sessionId);
-      if (deleted) {
-        console.log(`✅ Session logged out: ${sessionId}`);
+    let userId = null;
+
+    // First try to get userId from JWT token in Authorization header
+    if (req.headers.authorization) {
+      try {
+        const token = req.headers.authorization.replace('Bearer ', '');
+        // Use the imported jwt instead of require
+        const decoded = jwt.decode(token);
+        if (decoded && decoded.userId) {
+          userId = decoded.userId;
+          console.log('✅ Retrieved userId from JWT token:', userId);
+        }
+      } catch (tokenError) {
+        console.log('❌ Error decoding JWT token:', tokenError.message);
       }
     }
 
+    // If we have sessionId and still no userId, try to find the session
+    if (sessionId && !userId) {
+      console.log('🔄 Attempting to find session with sessionId:', sessionId);
+      try {
+        // Try to find session using SessionService methods
+        let foundSession = null;
+        
+        // Method 1: Try getAllSessions and find matching sessionId
+        try {
+          const sessions = await SessionService.getAllSessions();
+          foundSession = sessions.find(s => 
+            s.sessionId === sessionId || 
+            s._id.toString() === sessionId ||
+            (s.sessionId && s.sessionId.toString() === sessionId)
+          );
+          if (foundSession) {
+            console.log('✅ Found session via getAllSessions');
+          }
+        } catch (e) {
+          console.log('❌ getAllSessions failed:', e.message);
+        }
+        
+        if (foundSession) {
+          userId = foundSession.userId._id || foundSession.userId;
+          console.log('✅ Retrieved userId from session:', userId);
+        } else {
+          console.log('❌ No session found with sessionId:', sessionId);
+        }
+      } catch (sessionError) {
+        console.error('❌ Error retrieving session:', sessionError.message);
+        console.error('❌ Full session error:', sessionError);
+      }
+    }
+
+    // Fallback to auth middleware
+    if (!userId) {
+      console.log('🔄 Trying fallback methods for userId...');
+      console.log('🔍 req.user:', req.user);
+      userId = req.user?.userId || req.user?._id || req.userId;
+      console.log('🔄 Fallback - userId from auth middleware:', userId);
+    }
+
+    if (userId) {
+      console.log('🔄 Attempting to update user isVerified status...');
+      try {
+        const updateResult = await userModel.findByIdAndUpdate(
+          userId,
+          { 
+            isVerified: false,
+            lastActive: new Date()
+          },
+          { new: true }
+        );
+        
+        if (updateResult) {
+          console.log(`✅ User ${userId} isVerified set to false`);
+          console.log(`✅ Final isVerified status: ${updateResult.isVerified}`);
+        } else {
+          console.log(`❌ User not found with userId: ${userId}`);
+        }
+      } catch (updateError) {
+        console.error('❌ Error updating user isVerified status:', updateError);
+      }
+    } else {
+      console.log('❌ CRITICAL: No userId found - cannot update isVerified');
+    }
+
+    if (sessionId) {
+      console.log('🔄 Attempting to delete session...');
+      try {
+        const deleted = await SessionService.deleteSession(sessionId);
+        console.log('✅ Session deletion result:', deleted);
+      } catch (sessionError) {
+        console.error('❌ Error deleting session:', sessionError);
+      }
+    }
+
+    console.log('🔄 Clearing session cookie...');
     clearSessionCookie(res);
 
+    console.log('✅ Logout process completed successfully');
     return res.status(200).json({
       success: true,
       message: 'Logged out successfully',
     });
   } catch (error) {
     console.error('❌ Enhanced logout error:', error);
+    console.error('❌ Full error stack:', error.stack);
+    
+    // Always clear cookie on error too
     clearSessionCookie(res);
+    
     res.status(500).json({
       success: false,
       message: 'Logout completed with errors',
@@ -599,7 +704,6 @@ const logoutEnhanced = async (req, res) => {
     });
   }
 };
-
 /**
  * NEW - Revoke all sessions (logout from all devices)
  */
@@ -946,8 +1050,8 @@ const updateProfile = async (req, res) => {
       residence,
       countryOfResidence,
       dateOfGraduation,
-      specialty,        
-      educationStatus,  
+      specialty,
+      educationStatus,
       facebookUrl,
       twitterUrl,
       instagramUrl,
@@ -956,7 +1060,7 @@ const updateProfile = async (req, res) => {
     const profilePic = req.file;
 
     console.log("🔍 Extracted fields:", {
-      firstName, lastName, dateOfBirth, gender, institute, residence, dateOfGraduation, specialty,countryOfResidence
+      firstName, lastName, dateOfBirth, gender, institute, residence, dateOfGraduation, specialty, countryOfResidence
     });
     console.log('🔍 Social Media URLs:', {
       facebookUrl,
@@ -1059,7 +1163,7 @@ const updateProfile = async (req, res) => {
       updatedProfile.countryOfResidence = countryOfResidence;
     if (dateOfGraduation) updatedProfile.dateOfGraduation = dateOfGraduation;
     if (specialty) updatedProfile.specialty = specialty;
-    if (educationStatus) updatedProfile.educationStatus = educationStatus; 
+    if (educationStatus) updatedProfile.educationStatus = educationStatus;
 
 
     // Add social media URLs (even if empty, to allow clearing)
@@ -1109,22 +1213,6 @@ const updateProfile = async (req, res) => {
   }
 };
 
-// Simple Logout API
-const logout = async (req, res) => {
-  try {
-    return res.status(200).json({
-      success: true,
-      message: 'Logout successful',
-    });
-  } catch (error) {
-    console.error('Logout error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error during logout',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
-    });
-  }
-};
 
 export {
   register,
@@ -1140,8 +1228,6 @@ export {
   forgotPassword,
   verifyResetCode,
   resetPassword,
-  // Keep existing login/logout for backward compatibility if needed
-  logout, // Original logout function
   setSessionCookie, // Helper function
   clearSessionCookie, // Helper function
 };

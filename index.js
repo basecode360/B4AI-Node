@@ -21,6 +21,7 @@ import subcategoryRoutes from './routes/subcategory.route.js';
 
 import stripeRoutes from './routes/stripe.js';
 
+
 // Load environment variables
 dotenv.config();
 
@@ -135,8 +136,9 @@ app.get('/', (req, res) => {
       quiz: '/api/v1/quiz',
       questions: '/api/v1/questions',
       analytics: '/api/v1/analytics',
-      categories: '/api/v1/categories', // ✅ NEW
-      subcategories: '/api/v1/subcategories', // ✅ NEW
+      admin: '/api/v1/admin', // ✅ NEW: Admin endpoints
+      categories: '/api/v1/categories',
+      subcategories: '/api/v1/subcategories',
     },
     port: PORT,
     host: HOST,
@@ -145,8 +147,8 @@ app.get('/', (req, res) => {
       '/api/v1/auth - Authentication routes',
       '/api/v1/quiz - Quiz management routes with language support',
       '/api/v1/questions - Questions management and import routes',
-      '/api/v1/questions',
       '/api/v1/analytics - Analytics and performance routes',
+      '/api/v1/admin - Admin management routes (active users, etc.)', // ✅ NEW
     ],
     // ✅ New language support info
     languageSupport: {
@@ -158,6 +160,13 @@ app.get('/', (req, res) => {
         questions: '/api/v1/quiz/questions?language=french&category=Biology',
         languages: '/api/v1/quiz/languages',
       },
+    },
+    // ✅ NEW: Admin features
+    adminFeatures: {
+      activeUsers: '/api/v1/admin/active-users',
+      activeUserStats: '/api/v1/admin/active-users/stats',
+      requiresAuth: true,
+      requiresAdminRole: true,
     },
   });
 });
@@ -178,6 +187,7 @@ app.get('/health', (req, res) => {
       defaultLanguage: 'english',
       corsEnabled: true,
       fileUploadEnabled: true,
+      activeUserTracking: 'enabled', // ✅ NEW
     },
   });
 });
@@ -191,6 +201,9 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/quiz', quizRoute);
 app.use('/api/v1/student-quiz', studentQuizRoute);
 app.use('/api/v1/analytics', analyticsRoute);
+
+// ✅ NEW: Active Users Management Route (Admin only)
+
 app.use('/api/v1/universities', universitiesRoutes);
 
 // ✅ EXISTING ROUTES
@@ -229,7 +242,19 @@ app.use(
   analyticsRoute
 );
 
-// ✅ UPDATED API Documentation endpoint with language support
+// ✅ NEW: Active user route logging middleware
+app.use(
+  '/api/v1/admin',
+  (req, res, next) => {
+    console.log(`👥 Admin route accessed: ${req.method} ${req.path}`);
+    if (req.path.includes('active-users')) {
+      console.log(`📊 Active users management accessed by user:`, req.user?.email || 'unknown');
+    }
+    next();
+  }
+);
+
+// ✅ UPDATED API Documentation endpoint with active users support
 app.get('/api', (req, res) => {
   res.json({
     message: 'BoardBullets API Documentation',
@@ -248,12 +273,11 @@ app.get('/api', (req, res) => {
           'POST /verify-email - Email verification',
           'GET /profile/:userId - Get user profile',
           'PUT /update-profile - Update user profile',
-          'POST /logout - User logout',
+          
           'POST /forgot-password - Forgot password',
           'POST /reset-password - Reset password',
         ],
       },
-      // Test
       quiz: {
         base: '/api/v1/quiz',
         routes: [
@@ -310,7 +334,30 @@ app.get('/api', (req, res) => {
           'DELETE /reset-analytics - Reset user analytics (testing)',
         ],
       },
-      // ✅ NEW: Separate Categories documentation
+      // ✅ NEW: Admin Management endpoints
+      admin: {
+        base: '/api/v1/admin',
+        routes: [
+          'GET /active-users - Get currently active users (Admin only)',
+          'GET /active-users/stats - Get active user statistics (Admin only)',
+        ],
+        description: 'Admin-only endpoints for system management',
+        authentication: 'Requires valid JWT token and admin role',
+        examples: [
+          'GET /api/v1/admin/active-users?timeframe=24h&page=1&limit=20',
+          'GET /api/v1/admin/active-users?role=admin&sortBy=lastActive',
+          'GET /api/v1/admin/active-users/stats',
+        ],
+        features: [
+          'Real-time active user tracking',
+          'Session-based activity detection',
+          'Role-based filtering',
+          'Pagination support',
+          'Time-based activity filtering (24h, 7d, 30d)',
+          'Automatic logout detection',
+        ],
+      },
+      // ✅ EXISTING: Categories documentation
       categories: {
         base: '/api/v1/categories',
         routes: [
@@ -322,7 +369,7 @@ app.get('/api', (req, res) => {
           'GET /stats/count - Get categories with question count',
         ],
       },
-      // ✅ NEW: Separate Subcategories documentation
+      // ✅ EXISTING: Subcategories documentation
       subcategories: {
         base: '/api/v1/subcategories',
         routes: [
@@ -447,6 +494,7 @@ app.use((req, res) => {
       '/api/v1/quiz',
       '/api/v1/questions',
       '/api/v1/analytics',
+      '/api/v1/admin', // ✅ NEW
     ],
     // ✅ Add language support info for 404s
     languageSupport: {
@@ -459,7 +507,7 @@ app.use((req, res) => {
   });
 });
 
-// ✅ Enhanced server startup with language support info
+// ✅ Enhanced server startup with active user management info
 app.listen(PORT, HOST, () => {
   connectDB();
   console.log(`🚀 Server is running on port ${PORT}`);
@@ -483,11 +531,20 @@ app.listen(PORT, HOST, () => {
   console.log(
     `📁 Subcategories API: http://${HOST}:${PORT}/api/v1/subcategories`
   );
+  // ✅ NEW: Active Users Management API
+  console.log(`👥 Admin API: http://${HOST}:${PORT}/api/v1/admin`);
+  console.log(`📊 Active Users: http://${HOST}:${PORT}/api/v1/admin/active-users`);
+  console.log(`📈 Active User Stats: http://${HOST}:${PORT}/api/v1/admin/active-users/stats`);
+  
   console.log(`📁 File upload limit: 50MB`);
   console.log(`✅ Conditional body parsing enabled for file uploads`);
   console.log(`🌐 Language filtering enabled for quiz endpoints`);
+  console.log(`👥 Active user tracking enabled with session-based detection`);
   console.log(
     `🔗 Example: http://${HOST}:${PORT}/api/v1/quiz/categories?language=spanish`
+  );
+  console.log(
+    `🔗 Active Users Example: http://${HOST}:${PORT}/api/v1/admin/active-users?timeframe=24h`
   );
 });
 
@@ -503,4 +560,4 @@ process.on('SIGTERM', () => {
   });
 });
 
-export default app;
+export default app; 
