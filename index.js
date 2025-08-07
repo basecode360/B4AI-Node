@@ -212,17 +212,17 @@ app.use('/api/v1/educational-status', educationalStatusRoutes);
 app.use('/api/v1/specialties', specialtiesRoutes);
 
 // ✅ Route-specific logging middleware with language awareness
-app.use(
-  '/api/v1/quiz',
-  (req, res, next) => {
-    console.log(`🧠 Quiz route accessed: ${req.method} ${req.path}`);
-    if (req.query.language) {
-      console.log(`🌐 Language filter: ${req.query.language}`);
-    }
-    next();
-  },
-  quizRoute
-);
+// app.use(
+//   '/api/v1/quiz',
+//   (req, res, next) => {
+//     console.log(`🧠 Quiz route accessed: ${req.method} ${req.path}`);
+//     if (req.query.language) {
+//       console.log(`🌐 Language filter: ${req.query.language}`);
+//     }
+//     next();
+//   },
+//   quizRoute
+// );
 
 app.use(
   '/api/v1/questions',
