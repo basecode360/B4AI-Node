@@ -10,6 +10,9 @@ import universitiesRoutes from './routes/universities.route.js';
 import questionsRoutes from './routes/questions.route.js';
 import cookieParser from 'cookie-parser';
 import mongoose from 'mongoose';
+import compression from 'compression';
+import revenueRoutes from './routes/revenue.route.js';
+
 
 // ✅ EXISTING IMPORTS
 import countriesRoutes from './routes/countries.js';
@@ -26,7 +29,7 @@ import stripeRoutes from './routes/stripe.js';
 dotenv.config();
 
 const app = express();
-
+app.use(compression());
 const corsOption = {
   origin: (origin, callback) => {
     // List of allowed origins
@@ -241,6 +244,7 @@ app.use(
   },
   analyticsRoute
 );
+app.use('/api/v1/revenue', revenueRoutes);
 
 // ✅ NEW: Active user route logging middleware
 app.use(
