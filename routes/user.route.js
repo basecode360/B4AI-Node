@@ -105,13 +105,13 @@ router.get('/deletion-info', authenticateToken, async (req, res) => {
 router.delete('/delete-account', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { password, confirmation } = req.body;
+    const { password, confirmationText } = req.body;
 
     console.log('🗑️ Delete account request for user:', userId);
-    console.log('🔍 Confirmation text received:', confirmation);
+    console.log('🔍 Confirmation text received:', confirmationText);
 
     // Validate required fields
-    if (!password || !confirmation) {
+    if (!password || !confirmationText) {
       return res.status(400).json({
         success: false,
         message: 'Password and confirmation are required'
@@ -119,7 +119,7 @@ router.delete('/delete-account', authenticateToken, async (req, res) => {
     }
 
     // Validate confirmation text
-    if (confirmation !== 'DELETE') {
+    if (confirmationText !== 'DELETE') {
       return res.status(400).json({
         success: false,
         message: 'You must type DELETE to confirm account deletion'
