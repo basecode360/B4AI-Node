@@ -794,7 +794,8 @@ const getProfile = async (req, res) => {
   }
 };
 
-// Forgot Password - Send OTP
+
+// Forgot Password - Send OTP with 5-minute Timer Protection
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -817,33 +818,74 @@ const forgotPassword = async (req, res) => {
       });
     }
 
-    // Find user by email (must be verified user)
-    const user = await userModel.findOne({
+    // Check if email exists in userModel
+    const userExists = await userModel.findOne({
       email: email.toLowerCase(),
-      isVerified: true, // Only verified users can reset password
     });
 
-    if (!user) {
-      // Don't reveal if user exists for security
-      return res.status(200).json({
-        success: true,
-        message:
-          'If this email is registered, you will receive a password reset code.',
+    if (!userExists) {
+      console.log('❌ Email not registered:', email.toLowerCase());
+      return res.status(404).json({
+        success: false,
+        message: 'This email address is not registered. Please check your email or create a new account.',
         email: email.toLowerCase(),
       });
     }
 
-    console.log('✅ User found for password reset:', user.email);
+    // Check if user is verified
+   /* if (!userExists.isVerified) {
+      console.log('❌ User found but not verified:', email.toLowerCase());
+      return res.status(400).json({
+        success: false,
+        message: 'Please verify your email address first before resetting your password.',
+        email: email.toLowerCase(),
+      });
+    }
+*/
+    // 🚀 NEW: Check password reset cooldown timer (5 minutes for testing)
+    const COOLDOWN_MINUTES = 5; // 5 minutes cooldown for testing
+    const MIN_TIME_BEFORE_NEXT_RESET_MINUTES = 1; // Must have at least 1 minute left before allowing new reset
+
+    if (userExists.lastPasswordReset) {
+      const timeSinceLastReset = Date.now() - new Date(userExists.lastPasswordReset).getTime();
+      const minutesElapsed = timeSinceLastReset / (1000 * 60);
+      const remainingMinutes = COOLDOWN_MINUTES - minutesElapsed;
+
+      if (remainingMinutes > MIN_TIME_BEFORE_NEXT_RESET_MINUTES) {
+        console.log(`❌ Password reset blocked - ${remainingMinutes.toFixed(1)} minutes remaining`);
+        
+        const remainingTime = {
+          minutes: Math.floor(remainingMinutes),
+          seconds: Math.floor((remainingMinutes % 1) * 60),
+          totalSeconds: Math.floor(remainingMinutes * 60)
+        };
+
+        return res.status(429).json({
+          success: false,
+          message: `Password reset is temporarily blocked. Please wait ${remainingTime.minutes}m ${remainingTime.seconds}s before requesting another reset.`,
+          cooldownInfo: {
+            isActive: true,
+            remainingMinutes: parseFloat(remainingMinutes.toFixed(1)),
+            remainingTime,
+            nextAllowedTime: new Date(Date.now() + (remainingMinutes * 60 * 1000)),
+            lastResetTime: userExists.lastPasswordReset,
+            testingMode: true // Indicator for frontend
+          }
+        });
+      }
+    }
+
+    console.log('✅ User found and verified for password reset:', userExists.email);
 
     // Delete any existing verification codes for this user
-    await schemaForVerify.deleteMany({ userId: user._id });
+    await schemaForVerify.deleteMany({ userId: userExists._id });
 
     // Generate new verification code
     const resetCode = generateCode();
 
     // Create new verification entry
     const newVerification = new schemaForVerify({
-      userId: user._id,
+      userId: userExists._id,
       verificationCode: resetCode,
     });
     await newVerification.save();
@@ -853,9 +895,9 @@ const forgotPassword = async (req, res) => {
     // Send forgot password email
     try {
       await sendVerificationEmail(
-        user.email,
+        userExists.email,
         resetCode,
-        user.profile?.firstName || 'User'
+        userExists.profile?.firstName || 'User'
       );
 
       console.log('✅ Forgot password email sent successfully');
@@ -863,13 +905,18 @@ const forgotPassword = async (req, res) => {
       return res.status(200).json({
         success: true,
         message: 'Password reset code sent to your email',
-        email: user.email,
+        email: userExists.email,
+        cooldownInfo: {
+          isActive: false,
+          nextResetAllowedAfter: new Date(Date.now() + (COOLDOWN_MINUTES * 60 * 1000)),
+          testingMode: true
+        }
       });
     } catch (emailError) {
       console.error('❌ Failed to send forgot password email:', emailError);
 
       // Delete the verification entry if email fails
-      await schemaForVerify.deleteOne({ userId: user._id });
+      await schemaForVerify.deleteOne({ userId: userExists._id });
 
       return res.status(500).json({
         success: false,
@@ -1007,8 +1054,9 @@ const resetPassword = async (req, res) => {
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
 
-    // Update user password
+    // 🚀 NEW: Update user password and set lastPasswordReset timestamp
     user.password = hashedPassword;
+    user.lastPasswordReset = new Date(); // Set the cooldown timer
     await user.save();
 
     // Delete verification entry after successful password reset
@@ -1018,8 +1066,12 @@ const resetPassword = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message:
-        'Password reset successfully. You can now login with your new password.',
+      message: 'Password reset successfully. You can now login with your new password.',
+      cooldownInfo: {
+        message: 'Password reset cooldown is now active for 5 minutes (testing mode)',
+        nextResetAllowedAfter: new Date(Date.now() + (5 * 60 * 1000)), // 5 minutes from now
+        testingMode: true
+      }
     });
   } catch (error) {
     console.error('❌ Reset password error:', error);

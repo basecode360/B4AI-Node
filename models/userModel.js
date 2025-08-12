@@ -14,20 +14,20 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: [
       "admin",
-  "high_school",
-  "some_college",
-  "associate_degree",
-  "bachelors_degree",
-  "post_baccalaureate",
-  "masters_degree",
-  "doctoral_degree",
-  "medical_student",
-  "img",
-  "resident_physician",
-  "practicing_physician",
-  "other_healthcare",
-  "other_education"
-],
+      "high_school",
+      "some_college",
+      "associate_degree",
+      "bachelors_degree",
+      "post_baccalaureate",
+      "masters_degree",
+      "doctoral_degree",
+      "medical_student",
+      "img",
+      "resident_physician",
+      "practicing_physician",
+      "other_healthcare",
+      "other_education"
+    ],
     required: true,
     default: "high_school",
   },
@@ -105,6 +105,10 @@ const userSchema = new mongoose.Schema({
     paymentDate: Date,
     stripeSessionId: String,
     expiryDate: Date,
+  },
+  lastPasswordReset: {//work as a timer check for forgot password duration
+    type: Date,
+    default: null
   },
   // ✅ Added timestamps
   createdAt: {
