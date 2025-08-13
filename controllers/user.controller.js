@@ -820,7 +820,7 @@ const forgotPassword = async (req, res) => {
     // Find user by email (must be verified user)
     const user = await userModel.findOne({
       email: email.toLowerCase(),
-      isVerified: true, // Only verified users can reset password
+      // isVerified: true, 
     });
 
     if (!user) {
