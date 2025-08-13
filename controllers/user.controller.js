@@ -821,6 +821,7 @@ const forgotPassword = async (req, res) => {
     // Check if email exists in userModel
     const userExists = await userModel.findOne({
       email: email.toLowerCase(),
+      // isVerified: true, 
     });
 
     if (!userExists) {
