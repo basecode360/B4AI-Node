@@ -833,16 +833,6 @@ const forgotPassword = async (req, res) => {
       });
     }
 
-    // Check if user is verified
-   /* if (!userExists.isVerified) {
-      console.log('❌ User found but not verified:', email.toLowerCase());
-      return res.status(400).json({
-        success: false,
-        message: 'Please verify your email address first before resetting your password.',
-        email: email.toLowerCase(),
-      });
-    }
-*/
     // 🚀 NEW: Check password reset cooldown timer (5 minutes for testing)
     const COOLDOWN_MINUTES = 5; // 5 minutes cooldown for testing
     const MIN_TIME_BEFORE_NEXT_RESET_MINUTES = 1; // Must have at least 1 minute left before allowing new reset
@@ -952,7 +942,6 @@ const verifyResetCode = async (req, res) => {
     // Find user
     const user = await userModel.findOne({
       email: email.toLowerCase(),
-      isVerified: true,
     });
 
     if (!user) {
@@ -1026,7 +1015,6 @@ const resetPassword = async (req, res) => {
     // Find user
     const user = await userModel.findOne({
       email: email.toLowerCase(),
-      isVerified: true,
     });
 
     if (!user) {
