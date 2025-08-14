@@ -104,7 +104,25 @@ const userSchema = new mongoose.Schema({
     currency: String,
     paymentDate: Date,
     stripeSessionId: String,
+    stripePaymentIntentId: String,
     expiryDate: Date,
+    status: {
+      type: String,
+      enum: ["active", "cancelled", "expired"],
+      default: "active"
+    },
+    cancelledAt: {
+      type: Date,
+      default: null
+    },
+    cancellationReason: {
+      type: String,
+      default: null
+    },
+    autoRenew: {
+      type: Boolean,
+      default: true // User can turn this off
+    }
   },
   lastPasswordReset: {//work as a timer check for forgot password duration
     type: Date,

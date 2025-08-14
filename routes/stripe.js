@@ -123,6 +123,127 @@ router.post("/create-payment-intent", authenticateToken, async (req, res) => {
   }
 });
 
+// Cancel subscription endpoint
+router.post("/cancel-subscription", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { cancellationReason } = req.body;
+    
+    console.log(`🚫 Cancellation request from user: ${userId}`);
+    console.log(`📝 Request body:`, req.body);
+    console.log(`👤 User from auth:`, req.user);
+    
+    // Find user and check if they have active subscription
+    const user = await userModel.findById(userId);
+    
+    if (!user) {
+      console.log(`❌ User not found: ${userId}`);
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+        code: "USER_NOT_FOUND"
+      });
+    }
+    
+    console.log(`✅ User found: ${user.email}`);
+    console.log(`💰 Has paid: ${user.hasPaid}`);
+    console.log(`📋 Subscription details:`, user.subscriptionDetails);
+    
+    if (!user.hasPaid || !user.subscriptionDetails) {
+      console.log(`❌ No active subscription found for user: ${userId}`);
+      return res.status(400).json({
+        success: false,
+        message: "No active subscription found",
+        code: "NO_ACTIVE_SUBSCRIPTION"
+      });
+    }
+    
+    // ✅ FIXED: Check if subscription status exists and is not already cancelled
+    const currentStatus = user.subscriptionDetails.status || "active";
+    console.log(`📊 Current subscription status: ${currentStatus}`);
+    
+    if (currentStatus === "cancelled") {
+      console.log(`❌ Subscription already cancelled for user: ${userId}`);
+      return res.status(400).json({
+        success: false,
+        message: "Subscription is already cancelled",
+        code: "ALREADY_CANCELLED"
+      });
+    }
+    
+    // Calculate remaining days
+    const now = new Date();
+    const paymentDate = new Date(user.subscriptionDetails.paymentDate);
+    
+    // Calculate expiry based on plan type
+    let expiryDate = new Date(paymentDate);
+    if (user.subscriptionDetails.planType === "monthly") {
+      expiryDate.setMonth(expiryDate.getMonth() + 1);
+    } else if (user.subscriptionDetails.planType === "quarterly") {
+      expiryDate.setMonth(expiryDate.getMonth() + 3);
+    } else {
+      // Default to 1 month if plan type is unclear
+      expiryDate.setMonth(expiryDate.getMonth() + 1);
+    }
+    
+    const remainingDays = Math.max(0, Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24)));
+    
+    console.log(`📅 Payment date: ${paymentDate}`);
+    console.log(`📅 Calculated expiry: ${expiryDate}`);
+    console.log(`📊 Remaining days: ${remainingDays}`);
+    
+    // ✅ FIXED: Use proper update syntax for nested fields
+    const updateData = {
+      "subscriptionDetails.status": "cancelled",
+      "subscriptionDetails.cancelledAt": new Date(),
+      "subscriptionDetails.cancellationReason": cancellationReason || "User requested cancellation",
+      "subscriptionDetails.autoRenew": false,
+      "subscriptionDetails.expiryDate": expiryDate
+    };
+    
+    console.log(`🔄 Updating user with data:`, updateData);
+    
+    // Update subscription status
+    const updatedUser = await userModel.findByIdAndUpdate(
+      userId, 
+      updateData,
+      { new: true, runValidators: false } // ✅ ADDED: Return updated doc + skip validation
+    );
+    
+    if (!updatedUser) {
+      console.log(`❌ Failed to update user: ${userId}`);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to update subscription status",
+        code: "UPDATE_FAILED"
+      });
+    }
+    
+    console.log(`✅ Subscription cancelled for user: ${userId}`);
+    console.log(`✅ Updated subscription status: ${updatedUser.subscriptionDetails.status}`);
+    
+    res.json({
+      success: true,
+      message: "Subscription cancelled successfully",
+      cancellationDetails: {
+        cancelledAt: new Date(),
+        remainingDays: remainingDays,
+        expiryDate: expiryDate,
+        planType: user.subscriptionDetails.planType,
+        accessUntil: expiryDate.toLocaleDateString()
+      }
+    });
+  } catch (error) {
+    console.error("❌ Cancel subscription error:", error);
+    console.error("❌ Error stack:", error.stack);
+    res.status(500).json({
+      success: false,
+      message: "Failed to cancel subscription",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      code: "CANCELLATION_FAILED"
+    });
+  }
+});
 
 // Webhook endpoint - NO AUTH (Called by Stripe)
 router.post("/webhook", async (req, res) => {
@@ -227,7 +348,74 @@ router.post("/webhook", async (req, res) => {
   }
 });
 
-// Check payment status - WITH AUTH
+// Reactivate subscription endpoint
+router.post("/reactivate-subscription", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    console.log(`🔄 Reactivation request from user: ${userId}`);
+    
+    const user = await userModel.findById(userId);
+    
+    if (!user || !user.subscriptionDetails) {
+      return res.status(404).json({
+        success: false,
+        message: "No subscription found",
+        code: "NO_SUBSCRIPTION"
+      });
+    }
+    
+    if (user.subscriptionDetails.status !== "cancelled") {
+      return res.status(400).json({
+        success: false,
+        message: "Subscription is not cancelled",
+        code: "NOT_CANCELLED"
+      });
+    }
+    
+    // Check if subscription hasn't expired yet
+    const now = new Date();
+    const expiryDate = user.subscriptionDetails.expiryDate;
+    
+    if (now > expiryDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Subscription has already expired. Please purchase a new subscription.",
+        code: "SUBSCRIPTION_EXPIRED"
+      });
+    }
+    
+    // Reactivate subscription
+    await userModel.findByIdAndUpdate(userId, {
+      "subscriptionDetails.status": "active",
+      "subscriptionDetails.autoRenew": true,
+      "subscriptionDetails.cancelledAt": null,
+      "subscriptionDetails.cancellationReason": null
+    });
+    
+    console.log(`✅ Subscription reactivated for user: ${userId}`);
+    
+    res.json({
+      success: true,
+      message: "Subscription reactivated successfully",
+      reactivationDetails: {
+        reactivatedAt: new Date(),
+        expiryDate: expiryDate,
+        planType: user.subscriptionDetails.planType
+      }
+    });
+  } catch (error) {
+    console.error("Reactivate subscription error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reactivate subscription",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      code: "REACTIVATION_FAILED"
+    });
+  }
+});
+
+// Enhanced payment status to include cancellation info
 router.get("/payment-status", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -244,10 +432,38 @@ router.get("/payment-status", authenticateToken, async (req, res) => {
       });
     }
 
+    // ✅ Enhanced response with cancellation details
+    const subscriptionDetails = user.subscriptionDetails || null;
+    let accessStatus = "none";
+    let remainingDays = 0;
+    
+    if (subscriptionDetails) {
+      const now = new Date();
+      const expiryDate = subscriptionDetails.expiryDate || 
+        new Date(subscriptionDetails.paymentDate.getTime() + 
+          (subscriptionDetails.planType === "monthly" ? 30 : 90) * 24 * 60 * 60 * 1000);
+      
+      remainingDays = Math.max(0, Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24)));
+      
+      if (remainingDays > 0) {
+        accessStatus = subscriptionDetails.status === "cancelled" ? "cancelled_but_active" : "active";
+      } else {
+        accessStatus = "expired";
+      }
+    }
+
     res.json({
       success: true,
       hasPaid: user.hasPaid || false,
-      subscriptionDetails: user.subscriptionDetails || null,
+      subscriptionDetails: subscriptionDetails,
+      accessStatus: accessStatus,
+      remainingDays: remainingDays,
+      cancellationInfo: subscriptionDetails ? {
+        isCancelled: subscriptionDetails.status === "cancelled",
+        cancelledAt: subscriptionDetails.cancelledAt,
+        cancellationReason: subscriptionDetails.cancellationReason,
+        canReactivate: subscriptionDetails.status === "cancelled" && remainingDays > 0
+      } : null,
       user: {
         email: user.email,
         name: `${user.profile?.firstName || ''} ${user.profile?.lastName || ''}`.trim()
@@ -264,28 +480,28 @@ router.get("/payment-status", authenticateToken, async (req, res) => {
 });
 
 // Cancel subscription - WITH AUTH (for future use)
-router.post("/cancel-subscription", authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.userId;
+// router.post("/cancel-subscription", authenticateToken, async (req, res) => {
+//   try {
+//     const userId = req.user.userId;
     
-    // Update user subscription status
-    await userModel.findByIdAndUpdate(userId, {
-      "subscriptionDetails.cancelledAt": new Date(),
-      "subscriptionDetails.status": "cancelled"
-    });
+//     // Update user subscription status
+//     await userModel.findByIdAndUpdate(userId, {
+//       "subscriptionDetails.cancelledAt": new Date(),
+//       "subscriptionDetails.status": "cancelled"
+//     });
 
-    res.json({
-      success: true,
-      message: "Subscription cancelled successfully"
-    });
-  } catch (error) {
-    console.error("Cancel subscription error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to cancel subscription",
-      code: "CANCELLATION_FAILED"
-    });
-  }
-});
+//     res.json({
+//       success: true,
+//       message: "Subscription cancelled successfully"
+//     });
+//   } catch (error) {
+//     console.error("Cancel subscription error:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to cancel subscription",
+//       code: "CANCELLATION_FAILED"
+//     });
+//   }
+// });
 
 export default router;
