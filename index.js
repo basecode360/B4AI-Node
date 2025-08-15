@@ -33,17 +33,7 @@ app.use(compression());
 const corsOption = {
   origin: (origin, callback) => {
     // List of allowed origins
-    const allowedOrigins = [
-      'https://*.ngrok-free.app',
-      'exp://192.168.18.112:8081',
-      'exp://localhost:8081',
-      'https://b4ai.netlify.app',
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:3002',
-      'https://b4ai.netlify.app/',
-      'https://208.109.35.167',
-    ];
+    const allowedOrigins = ['https://208.109.35.167', 'app.lekh.io'];
 
     // Check if the origin is in the allowed list
     if (
