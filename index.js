@@ -11,8 +11,7 @@ import questionsRoutes from './routes/questions.route.js';
 import cookieParser from 'cookie-parser';
 import mongoose from 'mongoose';
 import compression from 'compression';
-import revenueRoutes from './routes/revenue.route.js  ';
-
+import revenueRoutes from './routes/revenue.route.js';
 
 // ✅ EXISTING IMPORTS
 import countriesRoutes from './routes/countries.js';
@@ -24,11 +23,12 @@ import subcategoryRoutes from './routes/subcategory.route.js';
 
 import stripeRoutes from './routes/stripe.js';
 
-
 // Load environment variables
 dotenv.config();
 
 const app = express();
+
+app.set('trust proxy', 1);
 app.use(compression());
 const corsOption = {
   origin: (origin, callback) => {
@@ -42,6 +42,7 @@ const corsOption = {
       'http://localhost:3001',
       'http://localhost:3002',
       'https://b4ai.netlify.app/',
+      'https://208.109.35.167',
     ];
 
     // Check if the origin is in the allowed list
@@ -126,8 +127,8 @@ app.use((req, res, next) => {
   next();
 });
 
-const PORT = process.env.PORT || 8080;
-const HOST = process.env.HOST || '0.0.0.0';
+const PORT = process.env.PORT || 9003;
+const HOST = process.env.HOST || '127.0.0.1';
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -196,7 +197,7 @@ app.get('/health', (req, res) => {
 });
 
 // ✅ QUESTIONS ROUTE FIRST (before other routes to avoid conflicts)
-app.use('/api/v1/questions', questionsRoutes);
+// app.use('/api/v1/questions', questionsRoutes);
 app.use('/api/v1/stripe', stripeRoutes);
 
 // ✅ Other API routes with enhanced logging
@@ -247,16 +248,16 @@ app.use(
 app.use('/api/v1/revenue', revenueRoutes);
 
 // ✅ NEW: Active user route logging middleware
-app.use(
-  '/api/v1/admin',
-  (req, res, next) => {
-    console.log(`👥 Admin route accessed: ${req.method} ${req.path}`);
-    if (req.path.includes('active-users')) {
-      console.log(`📊 Active users management accessed by user:`, req.user?.email || 'unknown');
-    }
-    next();
+app.use('/api/v1/admin', (req, res, next) => {
+  console.log(`👥 Admin route accessed: ${req.method} ${req.path}`);
+  if (req.path.includes('active-users')) {
+    console.log(
+      `📊 Active users management accessed by user:`,
+      req.user?.email || 'unknown'
+    );
   }
-);
+  next();
+});
 
 // ✅ UPDATED API Documentation endpoint with active users support
 app.get('/api', (req, res) => {
@@ -277,7 +278,7 @@ app.get('/api', (req, res) => {
           'POST /verify-email - Email verification',
           'GET /profile/:userId - Get user profile',
           'PUT /update-profile - Update user profile',
-          
+
           'POST /forgot-password - Forgot password',
           'POST /reset-password - Reset password',
         ],
@@ -537,9 +538,13 @@ app.listen(PORT, HOST, () => {
   );
   // ✅ NEW: Active Users Management API
   console.log(`👥 Admin API: http://${HOST}:${PORT}/api/v1/admin`);
-  console.log(`📊 Active Users: http://${HOST}:${PORT}/api/v1/admin/active-users`);
-  console.log(`📈 Active User Stats: http://${HOST}:${PORT}/api/v1/admin/active-users/stats`);
-  
+  console.log(
+    `📊 Active Users: http://${HOST}:${PORT}/api/v1/admin/active-users`
+  );
+  console.log(
+    `📈 Active User Stats: http://${HOST}:${PORT}/api/v1/admin/active-users/stats`
+  );
+
   console.log(`📁 File upload limit: 50MB`);
   console.log(`✅ Conditional body parsing enabled for file uploads`);
   console.log(`🌐 Language filtering enabled for quiz endpoints`);
@@ -564,4 +569,4 @@ process.on('SIGTERM', () => {
   });
 });
 
-export default app; 
+export default app;
