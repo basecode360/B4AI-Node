@@ -36,6 +36,7 @@ const corsOption = {
     const allowedOrigins = [
       'https://208.109.35.167',
       'https://app.lekh.io',
+      'http://app.lekh.io',
       'https://api.lekh.io',
     ];
 
