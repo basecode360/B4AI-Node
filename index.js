@@ -33,7 +33,11 @@ app.use(compression());
 const corsOption = {
   origin: (origin, callback) => {
     // List of allowed origins
-    const allowedOrigins = ['https://208.109.35.167', 'app.lekh.io'];
+    const allowedOrigins = [
+      'https://208.109.35.167',
+      'https://app.lekh.io',
+      'https://api.lekh.io',
+    ];
 
     // Check if the origin is in the allowed list
     if (
