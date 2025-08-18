@@ -1168,14 +1168,6 @@ const updateProfile = async (req, res) => {
         'Current Year:',
         currentYear
       );
-
-      if (dateOfGraduationYear >= currentYear) {
-        console.log('❌ dateOfGraduation validation failed - returning 400');
-        return res.status(400).json({
-          success: false,
-          message: 'Date of Graduation cannot be from current or future years',
-        });
-      }
     }
 
     // Get current user to preserve existing profile data

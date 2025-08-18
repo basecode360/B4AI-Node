@@ -18,9 +18,10 @@ const router = express.Router();
 
 
 // 📊 Revenue Analytics Routes (Admin only)
-router.get('/analytics' ,authenticateToken,authorizeAdmin,getRevenueAnalytics);
-router.get('/summary',authenticateToken,authorizeAdmin, getRevenueSummary);
-router.get('/users',authenticateToken, authorizeAdmin,getAllUsersRevenue);
+router.get('/analytics' , getRevenueAnalytics); //authenticateToken,authorizeAdmin,
+router.get('/summary', getRevenueSummary); // authenticateToken,authorizeAdmin,
+router.get('/users', getAllUsersRevenue); // authenticateToken, authorizeAdmin
+router.get('/user/:userId',  getUserRevenue);
 /*router.get('/user/:userId',  getUserRevenue); //these routes are not using on frontend
 router.post('/subscription/update',  updateSubscription);*/
 
