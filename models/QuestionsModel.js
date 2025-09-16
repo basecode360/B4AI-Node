@@ -224,20 +224,12 @@ questionsSchema.statics.bulkImportQuestions = async function (
 
     // Log summary of what we're importing
     const approvedCount = questionsArray.filter(q => q.approved === true).length;
-    console.log(`📋 Bulk import: ${questionsArray.length} questions (${approvedCount} pre-approved)`);
 
     for (let i = 0; i < questionsArray.length; i++) {
       const questionData = questionsArray[i];
       const rowNumber = questionData.originalIndex || i + 2; // Excel rows start at 2 (after header)
       
       // DEBUG: First 5 questions ka approved value check karo
-      if (i < 5) {
-        console.log(`❓ Question ${i + 1} approved check:`, {
-          originalValue: questionData.approved,
-          type: typeof questionData.approved,
-          willBeApproved: Boolean(questionData.approved)
-        });
-      }
       
       try {
         // Enhanced duplicate check
@@ -327,13 +319,6 @@ questionsSchema.statics.bulkImportQuestions = async function (
         });
 
         // Debug log for first few imports
-        if (i < 3) {
-          console.log(`✅ Saving Q${i + 1}:`, {
-            approved: newQuestion.approved,
-            status: newQuestion.status,
-            question: newQuestion.question.substring(0, 40) + '...'
-          });
-        }
 
         const savedQuestion = await newQuestion.save();
         results.imported++;
@@ -355,7 +340,6 @@ questionsSchema.statics.bulkImportQuestions = async function (
 
     // Log import summary
     const importedApproved = results.importedQuestions.filter(q => q.approved === true).length;
-    console.log(`✅ Import complete: ${results.imported} imported (${importedApproved} approved), ${results.skipped} skipped`);
 
     return results;
   } catch (error) {

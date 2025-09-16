@@ -11,7 +11,6 @@ export const trackQuizStart = async (req, res, next) => {
     
     next();
   } catch (error) {
-    console.error("❌ Quiz tracking error:", error);
     next(); // Continue even if tracking fails
   }
 };
@@ -31,12 +30,10 @@ export const ensureAnalyticsRecord = async (req, res, next) => {
     if (!analytics) {
       // Create a new analytics record
       await PerformanceAnalytics.create({ userId });
-      console.log("✅ Created analytics record for user:", userId);
     }
     
     next();
   } catch (error) {
-    console.error("❌ Analytics middleware error:", error);
     next(); // Continue even if this fails
   }
 };
@@ -133,7 +130,6 @@ export const getLeaderboardPosition = async (userId) => {
       percentile: Math.round(((totalUsers - higherCount) / totalUsers) * 100)
     };
   } catch (error) {
-    console.error("❌ Leaderboard calculation error:", error);
     return null;
   }
 };
@@ -156,7 +152,6 @@ export const batchUpdateAnalytics = async (updates) => {
       upsertedCount: result.upsertedCount
     };
   } catch (error) {
-    console.error("❌ Batch update error:", error);
     throw error;
   }
 };

@@ -5,8 +5,6 @@ export const sendEmail = async ({ to, subject, html, text }) => {
   try {
     // Verify transporter configuration
     await transporter.verify();
-    console.log('✅ Email transporter verified and ready');
-    
     const mailOptions = {
       from: `"B4AI Team" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
       to,
@@ -16,11 +14,8 @@ export const sendEmail = async ({ to, subject, html, text }) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('✉️ Email sent successfully:', info.messageId);
-    console.log('📧 Email sent to:', to);
     return info;
   } catch (error) {
-    console.error('❌ Email sending failed:', error);
     throw error;
   }
 };

@@ -180,14 +180,12 @@ class UniversityDataProcessor {
 
       // Validate required fields
       if (!country || !name) {
-        console.log(`❌ Row ${rowIndex + 2}: Missing required data - Country: "${countryRaw}", University: "${universityRaw}"`);
         this.errors++;
         return null;
       }
 
       // Skip if name is too short
       if (name.length < 3) {
-        console.log(`❌ Row ${rowIndex + 2}: University name too short: "${name}"`);
         this.errors++;
         return null;
       }
@@ -207,7 +205,6 @@ class UniversityDataProcessor {
       return universityDoc;
 
     } catch (error) {
-      console.error(`❌ Error processing row ${rowIndex + 2}:`, error.message);
       this.errors++;
       return null;
     }
@@ -228,16 +225,12 @@ class UniversityDataProcessor {
 // Main population function
 async function populateUniversitiesFromCSV(csvFilePath) {
   try {
-    console.log('🚀 Starting MongoDB Universities Population...');
-    console.log(`📂 Reading CSV file: ${csvFilePath}`);
 
     // Connect to MongoDB
     await mongoose.connect(MONGODB_URI);
-    console.log('✅ Connected to MongoDB');
 
     // Read CSV file
     const csvContent = fs.readFileSync(csvFilePath, 'utf8');
-    console.log('📖 CSV file loaded successfully');
 
     // Initialize processor
     const processor = new UniversityDataProcessor();
@@ -249,7 +242,6 @@ async function populateUniversitiesFromCSV(csvFilePath) {
         dynamicTyping: false, // Keep everything as strings for better control
         complete: async (results) => {
           try {
-            console.log(`📊 Found ${results.data.length} rows in CSV`);
             
             // Process each row
             const universityDocs = [];
@@ -264,7 +256,6 @@ async function populateUniversitiesFromCSV(csvFilePath) {
                 const uniqueKey = `${processedDoc.country.toLowerCase()}|||${processedDoc.name.toLowerCase()}`;
                 
                 if (duplicateChecks.has(uniqueKey)) {
-                  console.log(`⚠️  Duplicate in CSV: ${processedDoc.name} in ${processedDoc.country}`);
                   processor.duplicates++;
                   continue;
                 }
@@ -274,11 +265,9 @@ async function populateUniversitiesFromCSV(csvFilePath) {
               }
             }
 
-            console.log(`✅ Processed ${universityDocs.length} valid universities`);
 
             // Batch insert into MongoDB with duplicate handling
             if (universityDocs.length > 0) {
-              console.log('💾 Inserting into MongoDB...');
               
               // Use insertMany with ordered:false to continue on duplicates
               try {
@@ -294,7 +283,6 @@ async function populateUniversitiesFromCSV(csvFilePath) {
                   processor.duplicates += duplicateErrors.length;
                   processor.inserted = universityDocs.length - duplicateErrors.length;
                   
-                  console.log(`⚠️  Found ${duplicateErrors.length} duplicates in database`);
                 } else {
                   throw insertError;
                 }
@@ -303,14 +291,6 @@ async function populateUniversitiesFromCSV(csvFilePath) {
 
             // Generate final report
             const stats = processor.getStats();
-            console.log('\n📈 IMPORT COMPLETED!');
-            console.log('========================');
-            console.log(`Total Rows Processed: ${stats.totalProcessed}`);
-            console.log(`Successfully Inserted: ${stats.successfullyInserted}`);
-            console.log(`Duplicates Skipped: ${stats.duplicatesSkipped}`);
-            console.log(`Errors: ${stats.errors}`);
-            console.log(`Success Rate: ${stats.successRate}`);
-            console.log('========================\n');
 
             resolve(stats);
 
@@ -325,18 +305,15 @@ async function populateUniversitiesFromCSV(csvFilePath) {
     });
 
   } catch (error) {
-    console.error('❌ Population failed:', error);
     throw error;
   } finally {
     // Close MongoDB connection
     await mongoose.disconnect();
-    console.log('🔌 MongoDB connection closed');
   }
 }
 
 // Utility function to download the worldwide universities CSV
 async function downloadUniversitiesCSV() {
-  console.log('📥 Downloading universities CSV from GitHub...');
   
   try {
     const response = await fetch('https://raw.githubusercontent.com/code4mk/Universities-Worldwide/master/csv/universities.csv');
@@ -345,10 +322,8 @@ async function downloadUniversitiesCSV() {
     const filePath = './universities_worldwide.csv';
     fs.writeFileSync(filePath, csvContent);
     
-    console.log(`✅ Downloaded CSV to: ${filePath}`);
     return filePath;
   } catch (error) {
-    console.error('❌ Failed to download CSV:', error);
     throw error;
   }
 }
@@ -360,7 +335,6 @@ async function main() {
     let csvFilePath = args[0];
 
     if (!csvFilePath) {
-      console.log('🌐 No CSV file provided, downloading from GitHub...');
       csvFilePath = await downloadUniversitiesCSV();
     }
 
@@ -369,10 +343,8 @@ async function main() {
     }
 
     await populateUniversitiesFromCSV(csvFilePath);
-    console.log('🎉 Database population completed successfully!');
 
   } catch (error) {
-    console.error('💥 Script failed:', error.message);
     process.exit(1);
   }
 }

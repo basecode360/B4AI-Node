@@ -25,7 +25,6 @@ router.get('/:id', async (req, res) => {
       data: subcategory
     });
   } catch (error) {
-    console.error('❌ Error fetching subcategory:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch subcategory',
@@ -71,7 +70,6 @@ router.post('/', async (req, res) => {
       data: savedSubcategory
     });
   } catch (error) {
-    console.error('❌ Error creating subcategory:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create subcategory',
@@ -112,7 +110,6 @@ router.put('/:id', async (req, res) => {
       data: updatedSubcategory
     });
   } catch (error) {
-    console.error('❌ Error updating subcategory:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update subcategory',
@@ -141,7 +138,6 @@ router.delete('/:id', async (req, res) => {
       data: deletedSubcategory
     });
   } catch (error) {
-    console.error('❌ Error deleting subcategory:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete subcategory',
@@ -163,7 +159,6 @@ router.get('/stats/count', async (req, res) => {
       totalQuestions: subcategories.reduce((sum, subcat) => sum + subcat.count, 0)
     });
   } catch (error) {
-    console.error('❌ Error fetching subcategory stats:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch subcategory statistics',
@@ -189,7 +184,6 @@ router.get('/search/:searchTerm', async (req, res) => {
       searchTerm: searchTerm
     });
   } catch (error) {
-    console.error('❌ Error searching subcategories:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to search subcategories',

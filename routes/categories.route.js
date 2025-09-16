@@ -26,7 +26,6 @@ router.get('/:id', async (req, res) => {
       data: category
     });
   } catch (error) {
-    console.error('❌ Error fetching category:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch category',
@@ -72,7 +71,6 @@ router.post('/', async (req, res) => {
       data: savedCategory
     });
   } catch (error) {
-    console.error('❌ Error creating category:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create category',
@@ -113,7 +111,6 @@ router.put('/:id', async (req, res) => {
       data: updatedCategory
     });
   } catch (error) {
-    console.error('❌ Error updating category:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update category',
@@ -142,7 +139,6 @@ router.delete('/:id', async (req, res) => {
       data: deletedCategory
     });
   } catch (error) {
-    console.error('❌ Error deleting category:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete category',
@@ -164,7 +160,6 @@ router.get('/stats/count', async (req, res) => {
       totalQuestions: categories.reduce((sum, cat) => sum + cat.count, 0)
     });
   } catch (error) {
-    console.error('❌ Error fetching category stats:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch category statistics',

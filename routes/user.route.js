@@ -51,7 +51,6 @@ router.get('/sessions', authenticateToken, getUserSessions);
 router.get('/deletion-info', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    console.log('🔍 Getting deletion info for user:', userId);
 
     // Find user
     const user = await userModel.findById(userId);
@@ -64,7 +63,6 @@ router.get('/deletion-info', authenticateToken, async (req, res) => {
 
     // Get user analytics to show what will be deleted
     const analytics = await PerformanceAnalytics.findOne({ userId });
-    console.log('📊 User analytics found:', !!analytics);
 
     const deletionInfo = {
       accountInfo: {
@@ -83,7 +81,6 @@ router.get('/deletion-info', authenticateToken, async (req, res) => {
       }
     };
 
-    console.log('✅ Deletion info prepared:', deletionInfo);
 
     res.json({
       success: true,
@@ -92,7 +89,6 @@ router.get('/deletion-info', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Get deletion info error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get deletion info',
@@ -107,8 +103,6 @@ router.delete('/delete-account', authenticateToken, async (req, res) => {
     const userId = req.user.userId;
     const { password, confirmationText } = req.body;
 
-    console.log('🗑️ Delete account request for user:', userId);
-    console.log('🔍 Confirmation text received:', confirmationText);
 
     // Validate required fields
     if (!password || !confirmationText) {
@@ -159,7 +153,6 @@ router.delete('/delete-account', authenticateToken, async (req, res) => {
       deletionDate: new Date().toISOString()
     };
 
-    console.log('📊 Deletion summary:', deletionSummary);
 
     // Start transaction for atomic deletion
     const session = await mongoose.startSession();
@@ -169,15 +162,12 @@ router.delete('/delete-account', authenticateToken, async (req, res) => {
       // 1. Delete user analytics
       if (analytics) {
         await PerformanceAnalytics.deleteOne({ userId }, { session });
-        console.log('✅ Analytics deleted');
       }
       // 4. Delete the user account
       await userModel.deleteOne({ _id: userId }, { session });
-      console.log('✅ User account deleted');
 
       // Commit transaction
       await session.commitTransaction();
-      console.log('✅ All user data deleted successfully');
 
       // Send deletion confirmation email (optional)
       try {
@@ -236,11 +226,9 @@ router.delete('/delete-account', authenticateToken, async (req, res) => {
               </html>
             `
           });
-          console.log('✉️ Deletion confirmation email sent');
         }
       } catch (emailError) {
         // Email failure shouldn't stop the deletion
-        console.error('❌ Failed to send deletion confirmation email:', emailError);
       }
 
       res.json({
@@ -258,7 +246,6 @@ router.delete('/delete-account', authenticateToken, async (req, res) => {
     }
 
   } catch (error) {
-    console.error('❌ Delete account error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete account',
@@ -270,22 +257,12 @@ router.delete('/delete-account', authenticateToken, async (req, res) => {
 // ✅ ADMIN CREATE USER ENDPOINT WITH EMAIL
 router.post('/admin/create-user', authenticateToken, async (req, res) => {
   try {
-    console.log('🔧 DEBUG: Admin create user endpoint hit');
-    console.log('🔧 DEBUG: req.user from middleware:', req.user);
-    console.log('🔧 DEBUG: req.user.userId:', req.user?.userId);
 
     // ✅ FIRST: Get the requesting user from database to check their role
     const requestingUser = await userModel.findById(req.user.userId);
-    console.log('🔧 DEBUG: Found requesting user:', {
-      _id: requestingUser?._id,
-      email: requestingUser?.email,
-      role: requestingUser?.role,
-      exists: !!requestingUser,
-    });
 
     // Check if the requester exists
     if (!requestingUser) {
-      console.log('❌ DEBUG: Requesting user not found in database');
       return res.status(404).json({
         success: false,
         message: 'Requesting user not found',
@@ -294,10 +271,6 @@ router.post('/admin/create-user', authenticateToken, async (req, res) => {
 
     // ✅ NOW check if the requester is an admin
     if (requestingUser.role !== 'admin') {
-      console.log(
-        '❌ DEBUG: Role check failed - Expected: admin, Got:',
-        requestingUser.role
-      );
       return res.status(403).json({
         success: false,
         message: `Only admins can create users. Your role: ${requestingUser.role}`,
@@ -309,11 +282,9 @@ router.post('/admin/create-user', authenticateToken, async (req, res) => {
       });
     }
 
-    console.log('✅ DEBUG: Admin role verified successfully');
 
     const { email, password, role, profile, sendWelcomeEmail } = req.body;
 
-    console.log('👤 Admin creating new user:', email);
 
     // Validate required fields
     if (!email || !password) {
@@ -365,7 +336,6 @@ router.post('/admin/create-user', authenticateToken, async (req, res) => {
     });
 
     await newUser.save();
-    console.log('✅ User created successfully:', newUser.email);
 
     // Send welcome email if requested
     if (sendWelcomeEmail && sendEmail) {
@@ -434,9 +404,7 @@ router.post('/admin/create-user', authenticateToken, async (req, res) => {
         };
 
         await sendEmail(emailContent);
-        console.log('✉️ Welcome email sent to:', email);
       } catch (emailError) {
-        console.error('❌ Failed to send welcome email:', emailError);
         // Don't fail the user creation if email fails
       }
     }
@@ -460,7 +428,6 @@ router.post('/admin/create-user', authenticateToken, async (req, res) => {
       user: userResponse,
     });
   } catch (error) {
-    console.error('❌ Error creating user:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create user',
@@ -472,7 +439,6 @@ router.post('/admin/create-user', authenticateToken, async (req, res) => {
 // ✅ DATABASE INTEGRATED: USERS LIST ENDPOINT - Using your userModel
 router.get('/users', async (req, res) => {
   try {
-    console.log('👥 Fetching users from MongoDB database...');
 
     // Fetch all users from database using your existing userModel
     const users = await userModel
@@ -482,7 +448,6 @@ router.get('/users', async (req, res) => {
       )
       .sort({ createdAt: -1 }); // Latest first
 
-    console.log(`📊 Found ${users.length} users in MongoDB database`);
 
     // ✅ Transform data for frontend compatibility - map backend fields to frontend expectations
     const transformedUsers = users.map((user) => ({
@@ -523,7 +488,6 @@ router.get('/users', async (req, res) => {
       count: transformedUsers.length,
     });
   } catch (error) {
-    console.error('❌ MongoDB users fetch error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch users from database',
@@ -535,7 +499,6 @@ router.get('/users', async (req, res) => {
 // ✅ DATABASE INTEGRATED: USER STATS ENDPOINT (for dashboard)
 router.get('/stats', async (req, res) => {
   try {
-    console.log('📊 Fetching user statistics from MongoDB database...');
 
     // Get user statistics using your userModel
     const totalUsers = await userModel.countDocuments();
@@ -551,12 +514,6 @@ router.get('/stats', async (req, res) => {
       createdAt: { $gte: currentMonth },
     });
 
-    console.log('📊 Database statistics:', {
-      totalUsers,
-      activeUsers,
-      adminUsers,
-      newThisMonth,
-    });
 
     res.json({
       success: true,
@@ -570,7 +527,6 @@ router.get('/stats', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ MongoDB stats fetch error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch user statistics from database',
@@ -585,8 +541,6 @@ router.delete('/users/email/:email', authenticateToken, async (req, res) => {
     const { email } = req.params;
     const decodedEmail = decodeURIComponent(email); // Handle encoded emails
 
-    console.log('🗑️ DELETE BY EMAIL REQUEST:', decodedEmail);
-    console.log('🔍 Requested by user ID:', req.user?.userId);
 
     // Find user by email
     const userToDelete = await userModel.findOne({
@@ -594,21 +548,12 @@ router.delete('/users/email/:email', authenticateToken, async (req, res) => {
     });
 
     if (!userToDelete) {
-      console.log('❌ User not found with email:', decodedEmail);
       return res.status(404).json({
         success: false,
         message: `User with email ${decodedEmail} not found`,
       });
     }
 
-    console.log('✅ User found for deletion:', {
-      _id: userToDelete._id,
-      email: userToDelete.email,
-      name: `${userToDelete.profile?.firstName || ''} ${
-        userToDelete.profile?.lastName || ''
-      }`.trim(),
-      role: userToDelete.role,
-    });
 
     // Prevent deleting admin users (optional)
     /*if (userToDelete.role === 'admin') {
@@ -631,12 +576,6 @@ router.delete('/users/email/:email', authenticateToken, async (req, res) => {
       email: decodedEmail.toLowerCase(),
     });
 
-    console.log('✅ User deleted successfully by email:', {
-      email: deletedUser.email,
-      name: `${deletedUser.profile?.firstName || ''} ${
-        deletedUser.profile?.lastName || ''
-      }`.trim(),
-    });
 
     res.json({
       success: true,
@@ -650,7 +589,6 @@ router.delete('/users/email/:email', authenticateToken, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ DELETE BY EMAIL ERROR:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete user',
@@ -666,8 +604,6 @@ router.put('/users/email/:email', authenticateToken, async (req, res) => {
     const decodedEmail = decodeURIComponent(email);
     const updateData = req.body;
 
-    console.log('✏️ UPDATE BY EMAIL REQUEST:', decodedEmail);
-    console.log('📝 Update data received:', updateData);
 
     // Find user by email
     const existingUser = await userModel.findOne({
@@ -675,7 +611,6 @@ router.put('/users/email/:email', authenticateToken, async (req, res) => {
     });
 
     if (!existingUser) {
-      console.log('❌ User not found with email:', decodedEmail);
       return res.status(404).json({
         success: false,
         message: `User with email ${decodedEmail} not found`,
@@ -783,7 +718,6 @@ router.put('/users/email/:email', authenticateToken, async (req, res) => {
       updateFields.profile = mappedProfile;
     }
 
-    console.log('📋 Final update fields with mapping:', updateFields);
 
     // Update user by email
     const updatedUser = await userModel
@@ -799,7 +733,6 @@ router.put('/users/email/:email', authenticateToken, async (req, res) => {
         '-password -refreshToken -emailVerificationCode -passwordResetCode'
       );
 
-    console.log(' User updated successfully by email');
 
     res.json({
       success: true,
@@ -807,7 +740,6 @@ router.put('/users/email/:email', authenticateToken, async (req, res) => {
       user: updatedUser,
     });
   } catch (error) {
-    console.error('❌ UPDATE BY EMAIL ERROR:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update user',
@@ -822,7 +754,6 @@ router.get('/users/email/:email', authenticateToken, async (req, res) => {
     const { email } = req.params;
     const decodedEmail = decodeURIComponent(email);
 
-    console.log('👁️ GET BY EMAIL REQUEST:', decodedEmail);
 
     // Find user by email
     const user = await userModel
@@ -834,14 +765,12 @@ router.get('/users/email/:email', authenticateToken, async (req, res) => {
       );
 
     if (!user) {
-      console.log('❌ User not found with email:', decodedEmail);
       return res.status(404).json({
         success: false,
         message: `User with email ${decodedEmail} not found`,
       });
     }
 
-    console.log(' User details fetched successfully by email');
 
     res.json({
       success: true,
@@ -851,7 +780,6 @@ router.get('/users/email/:email', authenticateToken, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ GET BY EMAIL ERROR:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get user details',
@@ -863,7 +791,6 @@ router.get('/users/email/:email', authenticateToken, async (req, res) => {
 // DATABASE INTEGRATED: CHANGE PASSWORD ENDPOINT
 router.put('/change-password', authenticateToken, async (req, res) => {
   try {
-    console.log('🔐 Password change request for user:', req.user?.userId);
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
@@ -904,14 +831,12 @@ router.put('/change-password', authenticateToken, async (req, res) => {
       updatedAt: new Date(),
     });
 
-    console.log('✅ Password updated successfully in MongoDB');
 
     res.json({
       success: true,
       message: 'Password updated successfully',
     });
   } catch (error) {
-    console.error('❌ Password change error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to change password',
@@ -923,7 +848,6 @@ router.put('/change-password', authenticateToken, async (req, res) => {
 //  DATABASE INTEGRATED: UPLOAD AVATAR ENDPOINT
 router.put('/upload-avatar', authenticateToken, async (req, res) => {
   try {
-    console.log('📷 Avatar upload request for user:', req.user?.userId);
     const { imageData } = req.body;
 
     if (!imageData) {
@@ -954,7 +878,6 @@ router.put('/upload-avatar', authenticateToken, async (req, res) => {
       });
     }
 
-    console.log('✅ Avatar updated successfully in MongoDB');
 
     res.json({
       success: true,
@@ -965,7 +888,6 @@ router.put('/upload-avatar', authenticateToken, async (req, res) => {
       profilePic: imageData,
     });
   } catch (error) {
-    console.error('❌ Avatar upload error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to upload avatar',
@@ -978,7 +900,6 @@ router.put('/upload-avatar', authenticateToken, async (req, res) => {
 router.post('/test-delete-account', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    console.log('🧪 TEST: Delete account simulation for user:', userId);
 
     // Find user
     const user = await userModel.findById(userId);
@@ -1014,7 +935,6 @@ router.post('/test-delete-account', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Test delete account error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to simulate account deletion',
@@ -1074,7 +994,6 @@ router.get('/free-usage-limits', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Get free usage error:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Failed to get usage limits',
@@ -1089,7 +1008,6 @@ router.post('/update-free-usage', authenticateToken, async (req, res) => {
     const { questionsAnswered, mode, language, timestamp } = req.body;
     const userId = req.user.userId;
 
-    console.log(`📈 Updating usage for user ${userId}: +${questionsAnswered} questions in ${mode} mode (${language})`);
 
     const user = await userModel.findById(userId);
     
@@ -1134,7 +1052,6 @@ router.post('/update-free-usage', authenticateToken, async (req, res) => {
 
     await user.save();
 
-    console.log(`✅ Usage updated: ${user.freeQuizUsage.totalQuestionsUsed}/60 total used`);
 
     res.json({
       success: true,
@@ -1147,7 +1064,6 @@ router.post('/update-free-usage', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Update usage error:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Failed to update usage',

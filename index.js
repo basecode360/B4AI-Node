@@ -98,25 +98,16 @@ app.use((req, res, next) => {
 
 // ✅ Enhanced Request logging middleware with language detection
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
 
   // ✅ Log language parameter if present
   if (req.query.language) {
-    console.log(`🌐 Language filter detected: ${req.query.language}`);
   }
 
   if (req.path.includes('/import-excel')) {
-    console.log('📁 File upload route detected - skipping JSON parsing');
   }
 
   // ✅ Log quiz-related requests with more detail
   if (req.path.includes('/quiz/')) {
-    console.log('🧠 Quiz API request:', {
-      method: req.method,
-      path: req.path,
-      query: req.query,
-      language: req.query.language || 'not specified',
-    });
   }
 
   next();
@@ -214,9 +205,7 @@ app.use('/api/v1/specialties', specialtiesRoutes);
 // app.use(
 //   '/api/v1/quiz',
 //   (req, res, next) => {
-//     console.log(`🧠 Quiz route accessed: ${req.method} ${req.path}`);
 //     if (req.query.language) {
-//       console.log(`🌐 Language filter: ${req.query.language}`);
 //     }
 //     next();
 //   },
@@ -226,7 +215,6 @@ app.use('/api/v1/specialties', specialtiesRoutes);
 app.use(
   '/api/v1/questions',
   (req, res, next) => {
-    console.log(`❓ Questions route accessed: ${req.method} ${req.path}`);
     next();
   },
   questionsRoutes
@@ -235,7 +223,6 @@ app.use(
 app.use(
   '/api/v1/analytics',
   (req, res, next) => {
-    console.log(`📊 Analytics route accessed: ${req.method} ${req.path}`);
     next();
   },
   analyticsRoute
@@ -244,12 +231,7 @@ app.use('/api/v1/revenue', revenueRoutes);
 
 // ✅ NEW: Active user route logging middleware
 app.use('/api/v1/admin', (req, res, next) => {
-  console.log(`👥 Admin route accessed: ${req.method} ${req.path}`);
   if (req.path.includes('active-users')) {
-    console.log(
-      `📊 Active users management accessed by user:`,
-      req.user?.email || 'unknown'
-    );
   }
   next();
 });
@@ -388,15 +370,11 @@ app.get('/api', (req, res) => {
 
 // ✅ Enhanced error handling middleware with language-aware logging
 app.use((err, req, res, next) => {
-  console.error(`❌ Error occurred: ${err.message}`);
-  console.error(`📍 Route: ${req.method} ${req.path}`);
 
   // ✅ Log language context if available
   if (req.query.language) {
-    console.error(`🌐 Language context: ${req.query.language}`);
   }
 
-  console.error(`🔍 Stack: ${err.stack}`);
 
   if (err.message === 'Not allowed by CORS') {
     return res.status(403).json({
@@ -478,11 +456,9 @@ app.use((err, req, res, next) => {
 
 // ✅ Enhanced 404 handler with language support info
 app.use((req, res) => {
-  console.log(`❌ 404 - Route not found: ${req.method} ${req.path}`);
 
   // ✅ Check if it's a language-related query
   if (req.query.language) {
-    console.log(`🌐 Language parameter was: ${req.query.language}`);
   }
 
   res.status(404).json({
@@ -510,55 +486,12 @@ app.use((req, res) => {
 // ✅ Enhanced server startup with active user management info
 app.listen(PORT, HOST, () => {
   connectDB();
-  console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`🚀 Server running on http://${HOST}:${PORT}`);
-  console.log(`🌐 Network access: http://192.168.18.112:${PORT}`);
-  console.log(
-    `🧠 Quiz API with language support: http://${HOST}:${PORT}/api/v1/quiz`
-  );
-  console.log(
-    `📚 Universities API: http://${HOST}:${PORT}/api/v1/universities`
-  );
-  console.log(`🌍 Countries API: http://${HOST}:${PORT}/api/v1/countries`);
-  console.log(
-    `🎓 Educational Status API: http://${HOST}:${PORT}/api/v1/educational-status`
-  );
-  console.log(`⚕️ Specialties API: http://${HOST}:${PORT}/api/v1/specialties`);
-  console.log(`📊 Analytics API: http://${HOST}:${PORT}/api/v1/analytics`);
-  console.log(`❓ Questions API: http://${HOST}:${PORT}/api/v1/questions`);
-  // ✅ NEW: Separate Categories and Subcategories API logs
-  console.log(`📂 Categories API: http://${HOST}:${PORT}/api/v1/categories`);
-  console.log(
-    `📁 Subcategories API: http://${HOST}:${PORT}/api/v1/subcategories`
-  );
-  // ✅ NEW: Active Users Management API
-  console.log(`👥 Admin API: http://${HOST}:${PORT}/api/v1/admin`);
-  console.log(
-    `📊 Active Users: http://${HOST}:${PORT}/api/v1/admin/active-users`
-  );
-  console.log(
-    `📈 Active User Stats: http://${HOST}:${PORT}/api/v1/admin/active-users/stats`
-  );
-
-  console.log(`📁 File upload limit: 50MB`);
-  console.log(`✅ Conditional body parsing enabled for file uploads`);
-  console.log(`🌐 Language filtering enabled for quiz endpoints`);
-  console.log(`👥 Active user tracking enabled with session-based detection`);
-  console.log(
-    `🔗 Example: http://${HOST}:${PORT}/api/v1/quiz/categories?language=spanish`
-  );
-  console.log(
-    `🔗 Active Users Example: http://${HOST}:${PORT}/api/v1/admin/active-users?timeframe=24h`
-  );
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
   app.close(() => {
-    console.log('HTTP server closed');
     mongoose.connection.close(false, () => {
-      console.log('MongoDB connection closed');
       process.exit(0);
     });
   });

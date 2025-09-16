@@ -20,10 +20,6 @@ const authenticateToken = async (req, res, next) => {
     // Get session ID from cookies
     const sessionId = req.cookies?.session_id;
 
-    console.log('🔍 Auth attempt:', { 
-      hasToken: !!token, 
-      hasSession: !!sessionId 
-    });
 
     // STRATEGY 1: Try JWT Authentication First
     if (token) {
@@ -34,9 +30,7 @@ const authenticateToken = async (req, res, next) => {
       if (!decoded) {
         try {
           decoded = jwt.verify(token, process.env.JWT_SECRET);
-          console.log('🔄 Using legacy token verification');
         } catch (legacyError) {
-          console.log('🔴 Both JWT methods failed, trying session fallback...');
           // Don't return error yet, try session fallback
         }
       }
@@ -70,19 +64,16 @@ const authenticateToken = async (req, res, next) => {
           };
         }
 
-        console.log('✅ JWT authentication successful for:', decoded.userId);
         return next();
       }
     }
 
     // STRATEGY 2: JWT Failed or Missing - Try Session Fallback
     if (sessionId) {
-      console.log('🔄 Attempting session fallback for session:', sessionId);
       
       const session = await SessionService.findValidSession(sessionId);
       
       if (session && session.userId) {
-        console.log('✅ Valid session found, generating new JWT...');
         
         // Generate new JWT using session data
         const newTokenPayload = {
@@ -115,11 +106,9 @@ const authenticateToken = async (req, res, next) => {
         res.setHeader('X-Token-Expiration', JWTService.getTokenExpiration(newAccessToken));
         res.setHeader('X-Auth-Method', 'session-renewal'); // ✅ ADDED: Track auth method
         
-        console.log('🔄 New JWT generated via session for user:', session.userId.email);
         
         return next();
       } else {
-        console.log('🔴 Session invalid or expired');
       }
     }
 
@@ -133,7 +122,6 @@ const authenticateToken = async (req, res, next) => {
     }
 
     // Either token was provided but invalid, or session was invalid
-    console.log('❌ Authentication failed - no valid JWT or session');
     return res.status(401).json({
       success: false,
       message: 'Invalid or expired authentication. Please login again.',
@@ -141,7 +129,6 @@ const authenticateToken = async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('❌ Auth middleware error:', error);
     return res.status(500).json({
       success: false,
       message: 'Authentication service error',
@@ -190,10 +177,8 @@ const sessionOnlyAuth = async (req, res, next) => {
       role: session.userId.role,
     };
     
-    console.log('✅ Session-only auth successful for:', session.userId.email);
     next();
   } catch (error) {
-    console.error('❌ Session auth error:', error);
     return res.status(500).json({
       success: false,
       message: 'Session validation error',

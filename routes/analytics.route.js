@@ -9,8 +9,6 @@ const router = express.Router();
 // 📊 ENHANCED: Update analytics after quiz completion (Merged functionality)
 router.post('/update-analytics', authenticateToken, async (req, res) => {
   try {
-    console.log('📊 Analytics update request:', req.body);
-    console.log('👤 User ID:', req.user?.userId);
     
     const {
       quizMode,
@@ -26,15 +24,10 @@ router.post('/update-analytics', authenticateToken, async (req, res) => {
     
     const userId = req.user.userId;
 
-    console.log("\n📊 ============ ANALYTICS UPDATE REQUEST ============");
-    console.log("👤 User:", userId);
-    console.log("📝 Quiz Data:", { quizMode, totalQuestions, correctAnswers, timeSpent, category });
     
     //  CRITICAL CHECK: BB Points logic
     if (quizMode === 'TIMED') {
-      console.log("💰 TIMED MODE: BB Points will be calculated and added to cumulativeScore");
     } else {
-      console.log("❌ NON-TIMED MODE:", quizMode, "- NO BB Points will be added to cumulativeScore");
     }
 
     // Validation
@@ -58,7 +51,6 @@ router.post('/update-analytics', authenticateToken, async (req, res) => {
     let analytics = await PerformanceAnalytics.findOne({ userId });
     
     if (!analytics) {
-      console.log('🆕 Creating new analytics record for user:', userId);
       analytics = new PerformanceAnalytics({ userId });
     }
 
@@ -112,17 +104,7 @@ router.post('/update-analytics', authenticateToken, async (req, res) => {
       markedQuestions
     });
 
-    console.log('Analytics successfully updated');
 
-    console.log(" ============ ANALYTICS UPDATE SUCCESSFUL ============");
-    console.log("📈 Final Results:");
-    console.log("   - Quiz Mode:", quizMode);
-    console.log("   - Total BB Points (cumulativeScore):", updatedAnalytics.cumulativeScore);
-    console.log("   - Last Quiz BB Points:", updatedAnalytics.lastQuiz.bbPointsEarned);
-    console.log("   - Total Quizzes:", updatedAnalytics.totalQuizzesTaken);
-    console.log("   - Accuracy:", updatedAnalytics.accuracyPercentage + "%");
-    console.log("   - Last Quiz Score:", updatedAnalytics.lastQuizScore + "%");
-    console.log("============================================\n");
     
     //  ENHANCED: Return comprehensive response
     return res.status(200).json({
@@ -147,7 +129,6 @@ router.post('/update-analytics', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Analytics update error:", error);
     res.status(500).json({
       success: false,
       message: 'Failed to update analytics',
@@ -159,17 +140,14 @@ router.post('/update-analytics', authenticateToken, async (req, res) => {
 // 📱 ENHANCED: Get user stats (for mobile app) - All dashboard requirements
 router.get('/user-stats', authenticateToken, async (req, res) => {
   try {
-    console.log('📈 Enhanced user stats request for user:', req.user.userId);
     
     const userId = req.user.userId;
 
-    console.log("📊 GET USER STATS REQUEST for user:", userId);
 
     // Find user analytics
     const analytics = await PerformanceAnalytics.findOne({ userId });
 
     if (!analytics) {
-      console.log('📊 No analytics data found, returning default values');
       return res.status(200).json({
         success: true,
         message: "No analytics data found",
@@ -202,7 +180,6 @@ router.get('/user-stats', authenticateToken, async (req, res) => {
       });
     }
     
-    console.log(' Enhanced user stats retrieved');
     
     return res.status(200).json({
       success: true,
@@ -236,7 +213,6 @@ router.get('/user-stats', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Get user stats error:", error);
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve stats',
@@ -248,7 +224,6 @@ router.get('/user-stats', authenticateToken, async (req, res) => {
 // NEW: Get category-wise performance (Premium feature)
 router.get('/category-performance', authenticateToken, async (req, res) => {
   try {
-    console.log('📂 Category performance request for user:', req.user.userId);
     
     const userId = req.user.userId;
     const analytics = await PerformanceAnalytics.findOne({ userId });
@@ -264,7 +239,6 @@ router.get('/category-performance', authenticateToken, async (req, res) => {
     
     const categoryStats = analytics.getCategoryStats ? analytics.getCategoryStats() : {};
     
-    console.log(' Category performance retrieved:', Object.keys(categoryStats).length, 'categories');
     
     return res.status(200).json({
       success: true,
@@ -280,7 +254,6 @@ router.get('/category-performance', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Get category performance error:", error);
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve category performance',
@@ -292,7 +265,6 @@ router.get('/category-performance', authenticateToken, async (req, res) => {
 // NEW: Get performance trends (Premium feature)
 router.get('/performance-trends', authenticateToken, async (req, res) => {
   try {
-    console.log('📈 Performance trends request for user:', req.user.userId);
     
     const userId = req.user.userId;
     const limit = parseInt(req.query.limit) || 20;
@@ -314,7 +286,6 @@ router.get('/performance-trends', authenticateToken, async (req, res) => {
     // Calculate trend analysis
     const trendAnalysis = analytics.getRecentTrend ? analytics.getRecentTrend() : null;
     
-    console.log(' Performance trends retrieved:', recentTrends.length, 'entries');
     
     return res.status(200).json({
       success: true,
@@ -331,7 +302,6 @@ router.get('/performance-trends', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Get performance trends error:", error);
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve performance trends',
@@ -353,7 +323,6 @@ function getMostPlayedMode(trends) {
 // NEW: Get performance insights (Premium feature)
 router.get('/performance-insights', authenticateToken, async (req, res) => {
   try {
-    console.log('🔍 Performance insights request for user:', req.user.userId);
     
     const userId = req.user.userId;
     const analytics = await PerformanceAnalytics.findOne({ userId });
@@ -379,7 +348,6 @@ router.get('/performance-insights', authenticateToken, async (req, res) => {
       recommendations: ['Take more quizzes to get better insights']
     };
     
-    console.log(' Performance insights generated');
     
     return res.status(200).json({
       success: true,
@@ -393,7 +361,6 @@ router.get('/performance-insights', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Get performance insights error:", error);
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve performance insights',
@@ -415,8 +382,6 @@ function calculateDataCompleteness(analytics) {
 // 🔧 ENHANCED: Admin get all users' analytics with detailed info
 router.get('/admin/all-stats', authenticateToken, async (req, res) => {
   try {
-    console.log('🔧 Admin all stats request');
-    console.log('👤 Requested by user:', req.user?.userId || 'No auth');
     
     // Pagination parameters
     const page = parseInt(req.query.page) || 1;
@@ -442,7 +407,6 @@ router.get('/admin/all-stats', authenticateToken, async (req, res) => {
       .limit(limit)
       .lean();
     
-    console.log(`📊 Found ${analytics.length} analytics records`);
     
     // Transform data for admin dashboard
     const transformedAnalytics = analytics.map(analytic => ({
@@ -493,8 +457,6 @@ router.get('/admin/all-stats', authenticateToken, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Get all stats error:', error);
-    console.error('Error stack:', error.stack);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve analytics',
@@ -506,7 +468,6 @@ router.get('/admin/all-stats', authenticateToken, async (req, res) => {
 // 📊 ENHANCED: Admin summary statistics
 router.get('/admin/summary', authenticateToken, async (req, res) => {
   try {
-    console.log('📊 Admin summary stats request');
     
     // TODO: Add admin role check
     
@@ -663,7 +624,6 @@ router.get('/admin/summary', authenticateToken, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Get summary stats error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve summary statistics',
@@ -677,7 +637,6 @@ router.get("/last-quiz", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    console.log("📊 GET LAST QUIZ REQUEST for user:", userId);
 
     const analytics = await PerformanceAnalytics.findOne({ userId }).select('lastQuiz');
 
@@ -691,11 +650,6 @@ router.get("/last-quiz", authenticateToken, async (req, res) => {
       });
     }
 
-    console.log(" Last quiz data retrieved:");
-    console.log("   - Mode:", analytics.lastQuiz.quizMode);
-    console.log("   - BB Points:", analytics.lastQuiz.bbPointsEarned);
-    console.log("   - Accuracy:", analytics.lastQuiz.accuracy + "%");
-    console.log("   - Category:", analytics.lastQuiz.category || 'None');
 
     res.json({
       success: true,
@@ -706,7 +660,6 @@ router.get("/last-quiz", authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Get last quiz error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to retrieve last quiz data",
@@ -720,7 +673,6 @@ router.get("/bb-points-summary", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    console.log("🏆 GET BB POINTS SUMMARY REQUEST for user:", userId);
 
     const analytics = await PerformanceAnalytics.findOne({ userId });
 
@@ -762,11 +714,6 @@ router.get("/bb-points-summary", authenticateToken, async (req, res) => {
       lastQuizScore: analytics.lastQuizScore || 0
     };
 
-    console.log(" BB Points summary retrieved:");
-    console.log("   - Total BB Points:", bbPointsSummary.totalBBPoints);
-    console.log("   - Last Quiz BB Points:", bbPointsSummary.lastQuizBBPoints);
-    console.log("   - Exact TIMED Quizzes:", bbPointsSummary.exactTimedQuizCount);
-    console.log("   - TIMED Time %:", bbPointsSummary.timedTimePercentage + "%");
 
     res.json({
       success: true,
@@ -775,7 +722,6 @@ router.get("/bb-points-summary", authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Get BB Points summary error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to retrieve BB Points summary",
@@ -789,7 +735,6 @@ router.get('/leaderboard/bb-points', authenticateToken, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
     
-    console.log('🏆 BB Points leaderboard request, limit:', limit);
     
     const leaderboard = await PerformanceAnalytics.find({ cumulativeScore: { $gt: 0 } })
       .populate('userId', 'email profile.firstName profile.lastName')
@@ -812,7 +757,6 @@ router.get('/leaderboard/bb-points', authenticateToken, async (req, res) => {
       lastQuizMode: entry.lastQuiz?.quizMode || 'Unknown'
     }));
     
-    console.log('✅ BB Points leaderboard retrieved:', transformedLeaderboard.length, 'entries');
     
     return res.status(200).json({
       success: true,
@@ -823,7 +767,6 @@ router.get('/leaderboard/bb-points', authenticateToken, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ BB Points leaderboard error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve BB Points leaderboard',
@@ -837,7 +780,6 @@ router.get('/admin/user/:userId', authenticateToken, async (req, res) => {
   try {
     const { userId } = req.params;
     
-    console.log('📈 Admin requesting analytics for user:', userId);
     
     // TODO: Add admin role check
     
@@ -884,7 +826,6 @@ router.get('/admin/user/:userId', authenticateToken, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ User analytics error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve user analytics',
@@ -898,7 +839,6 @@ router.get("/verify-bb-points", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    console.log("🔍 VERIFYING BB POINTS SOURCE for user:", userId);
 
     const analytics = await PerformanceAnalytics.findOne({ userId });
 
@@ -937,11 +877,6 @@ router.get("/verify-bb-points", authenticateToken, async (req, res) => {
         '🎯 Continue taking TIMED quizzes to earn more BB Points'
     };
 
-    console.log(" BB Points verification completed:");
-    console.log("   - Cumulative Score:", verification.cumulativeScore);
-    console.log("   - Exact TIMED Quizzes:", verification.exactTimedQuizCount);
-    console.log("   - TIMED Time %:", verification.timedTimePercentage);
-    console.log("   - Status:", verification.warning);
 
     res.json({
       success: true,
@@ -950,7 +885,6 @@ router.get("/verify-bb-points", authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ BB Points verification error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to verify BB Points source",
@@ -964,7 +898,6 @@ router.delete('/admin/reset/:userId', authenticateToken, async (req, res) => {
   try {
     const { userId } = req.params;
     
-    console.log('🗑️ Admin resetting analytics for user:', userId);
     
     // TODO: Add admin role check and confirmation
     
@@ -977,7 +910,6 @@ router.delete('/admin/reset/:userId', authenticateToken, async (req, res) => {
       });
     }
     
-    console.log(' Analytics reset successfully');
     
     return res.status(200).json({
       success: true,
@@ -985,7 +917,6 @@ router.delete('/admin/reset/:userId', authenticateToken, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Reset analytics error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to reset analytics',
@@ -997,7 +928,6 @@ router.delete('/admin/reset/:userId', authenticateToken, async (req, res) => {
 // 📥 ENHANCED: Admin export analytics data
 router.get('/admin/export', authenticateToken, async (req, res) => {
   try {
-    console.log('📥 Export analytics request');
     
     // TODO: Add admin role check
     
@@ -1086,7 +1016,6 @@ router.get('/admin/export', authenticateToken, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Export error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to export analytics',
@@ -1098,7 +1027,6 @@ router.get('/admin/export', authenticateToken, async (req, res) => {
 // NEW: Export enhanced analytics
 router.get('/admin/export-enhanced', authenticateToken, async (req, res) => {
   try {
-    console.log('📥 Enhanced export request');
     
     const format = req.query.format || 'json';
     const includeCategories = req.query.includeCategories === 'true';
@@ -1193,7 +1121,6 @@ router.get('/admin/export-enhanced', authenticateToken, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Enhanced export error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to export enhanced analytics',
@@ -1208,7 +1135,6 @@ router.delete("/reset-analytics", authenticateToken, async (req, res) => {
     const userId = req.user.userId;
     const { confirm } = req.query;
 
-    console.log("🗑️ RESET ANALYTICS REQUEST for user:", userId);
 
     if (confirm !== 'true') {
       return res.status(400).json({
@@ -1226,7 +1152,6 @@ router.delete("/reset-analytics", authenticateToken, async (req, res) => {
       });
     }
 
-    console.log(" Analytics data reset successfully");
 
     res.json({
       success: true,
@@ -1235,7 +1160,6 @@ router.delete("/reset-analytics", authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Reset analytics error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to reset analytics data",
@@ -1249,7 +1173,6 @@ router.get("/overview", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    console.log("📊 GET ANALYTICS OVERVIEW REQUEST for user:", userId);
 
     const analytics = await PerformanceAnalytics.findOne({ userId });
 
@@ -1310,7 +1233,6 @@ router.get("/overview", authenticateToken, async (req, res) => {
       }
     };
 
-    console.log(" Analytics overview retrieved successfully");
 
     res.json({
       success: true,
@@ -1319,7 +1241,6 @@ router.get("/overview", authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Get analytics overview error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to retrieve analytics overview",
@@ -1333,8 +1254,6 @@ router.get("/leaderboard", authenticateToken, async (req, res) => {
   try {
     const { limit = 10, mode = 'bb-points' } = req.query;
 
-    console.log("🏆 GET LEADERBOARD REQUEST");
-    console.log("📊 Mode:", mode, "Limit:", limit);
 
     // Build query based on mode
     let sortField = 'cumulativeScore'; // Default sort by BB Points
@@ -1374,7 +1293,6 @@ router.get("/leaderboard", authenticateToken, async (req, res) => {
       };
     });
 
-    console.log("✅ Leaderboard retrieved successfully");
 
     res.json({
       success: true,
@@ -1386,7 +1304,6 @@ router.get("/leaderboard", authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Get leaderboard error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to retrieve leaderboard",

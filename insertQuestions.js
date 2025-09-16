@@ -4,8 +4,8 @@ import mongoose from "mongoose";
 const mongoURI = "mongodb+srv://danie123123:danie123123@cluster0.orbixvd.mongodb.net/";
 
 mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.log(err));
+  .then(() => {})
+  .catch(err => {});
 
 // Define the schema for the questions
 const questionSchema = new mongoose.Schema({
@@ -205,10 +205,8 @@ const quizQuestions = [
 // Insert multiple questions into the database
 Question.insertMany(quizQuestions)
   .then((docs) => {
-    console.log('Inserted quiz questions:', docs);
     mongoose.connection.close(); // Close connection after insertion
   })
   .catch((err) => {
-    console.error('Error inserting questions:', err);
     mongoose.connection.close(); // Close connection on error
   });

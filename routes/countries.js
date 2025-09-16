@@ -7,7 +7,6 @@ const router = express.Router();
 // ✅ GET /api/countries - Get all countries
 router.get("/", async (req, res) => {
   try {
-    console.log("🌍 Fetching all countries...");
     
     const { search, limit = 250 } = req.query;
     
@@ -28,7 +27,6 @@ router.get("/", async (req, res) => {
       .limit(parseInt(limit))
       .lean();
     
-    console.log(`✅ Found ${countries.length} countries`);
     
     res.status(200).json({
       success: true,
@@ -38,7 +36,6 @@ router.get("/", async (req, res) => {
     });
     
   } catch (error) {
-    console.error("❌ Error fetching countries:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch countries",
@@ -52,7 +49,6 @@ router.get("/search", async (req, res) => {
   try {
     const { q, limit = 10 } = req.query;
     
-    console.log(`🔍 Searching countries with query: "${q}"`);
     
     if (!q || q.length < 1) {
       return res.status(400).json({
@@ -73,7 +69,6 @@ router.get("/search", async (req, res) => {
       .limit(parseInt(limit))
       .lean();
     
-    console.log(`✅ Search results: ${countries.length} countries found`);
     
     res.status(200).json({
       success: true,
@@ -82,7 +77,6 @@ router.get("/search", async (req, res) => {
     });
     
   } catch (error) {
-    console.error("❌ Error searching countries:", error);
     res.status(500).json({
       success: false,
       message: "Failed to search countries",

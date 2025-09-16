@@ -6,7 +6,6 @@ const router = express.Router();
 // ✅ GET /api/educational-status - Get all educational statuses
 router.get("/", async (req, res) => {
   try {
-    console.log("🎓 Fetching all educational statuses...");
     
     const statuses = await educationalStatusModel
       .find({ isActive: true })
@@ -14,7 +13,6 @@ router.get("/", async (req, res) => {
       .sort({ statusId: 1 })
       .lean();
     
-    console.log(`✅ Found ${statuses.length} educational statuses`);
     
     res.status(200).json({
       success: true,
@@ -24,7 +22,6 @@ router.get("/", async (req, res) => {
     });
     
   } catch (error) {
-    console.error("❌ Error fetching educational statuses:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch educational statuses",
@@ -38,7 +35,6 @@ router.get("/:value", async (req, res) => {
   try {
     const { value } = req.params;
     
-    console.log(`🔍 Fetching educational status: "${value}"`);
     
     const status = await educationalStatusModel
       .findOne({ value })
@@ -52,7 +48,6 @@ router.get("/:value", async (req, res) => {
       });
     }
     
-    console.log(`✅ Found educational status: ${status.label}`);
     
     res.status(200).json({
       success: true,
@@ -61,7 +56,6 @@ router.get("/:value", async (req, res) => {
     });
     
   } catch (error) {
-    console.error("❌ Error fetching educational status:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch educational status",

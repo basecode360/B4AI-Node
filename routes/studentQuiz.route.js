@@ -12,8 +12,6 @@ import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-console.log('✅ Student Quiz Routes loaded');
-
 // 🐛 DEBUG ROUTE - Add this temporarily to check collection
 router.get('/debug', authenticateToken, debugCollection);
 

@@ -20,8 +20,6 @@ router.get('/categories', async (req, res) => {
     // ✅ Get language filter from query params
     const { language } = req.query;
 
-    console.log('📚 Fetching categories from Questions collection...');
-    console.log('🌐 Language filter:', language || 'all languages');
 
     // Get categories from Questions collection (if exists) or Quiz collection
     let Questions;
@@ -41,10 +39,8 @@ router.get('/categories', async (req, res) => {
     // ✅ Add language filter if provided
     if (language && language !== 'all') {
       matchFilter.language = language;
-      console.log('🔍 Filtering by language:', language);
     }
 
-    console.log('🔍 MongoDB match filter:', matchFilter);
 
     // ✅ Dynamic categories with counts and language filtering
     const categoriesData = await Questions.aggregate([
@@ -75,11 +71,6 @@ router.get('/categories', async (req, res) => {
       },
     ]);
 
-    console.log(
-      `✅ Found ${categoriesData.length} categories for language: ${
-        language || 'all'
-      }`
-    );
 
     // ✅ Transform to match frontend expectations
     const transformedCategories = categoriesData.map((cat) => ({
@@ -109,11 +100,9 @@ router.get('/categories', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Get categories error:', error);
 
     // ✅ Fallback to Quiz collection if Questions fails
     try {
-      console.log('🔄 Falling back to Quiz collection...');
       const fallbackCategories = await Quiz.getCategoriesWithCounts();
 
       res.json({
@@ -147,13 +136,6 @@ router.get('/questions', async (req, res) => {
       random = 'true',
     } = req.query;
 
-    console.log('🔍 Fetching questions with enhanced filters:', {
-      category,
-      language,
-      difficulty,
-      examType,
-      limit,
-    });
 
     // Try Questions collection first, fallback to Quiz
     let Questions;
@@ -175,11 +157,9 @@ router.get('/questions', async (req, res) => {
     if (difficulty && difficulty !== 'all') filter.difficulty = difficulty;
     if (examType && examType !== 'all') filter.examType = examType;
 
-    console.log('🔍 Final MongoDB filter:', filter);
 
     // ✅ First check if questions exist with these filters
     const totalCount = await Questions.countDocuments(filter);
-    console.log(`📊 Total questions matching filter: ${totalCount}`);
 
     if (totalCount === 0) {
       // ✅ Enhanced error response with language info
@@ -223,7 +203,6 @@ router.get('/questions', async (req, res) => {
         Math.random() * Math.max(0, totalCount - parseInt(limit))
       );
       query = query.skip(randomSkip);
-      console.log(`🎲 Random skip applied: ${randomSkip}`);
     }
 
     const questions = await query.limit(parseInt(limit));
@@ -232,15 +211,7 @@ router.get('/questions', async (req, res) => {
     const validQuestions = questions.filter((q) => q.language === language);
     const invalidFiltered = questions.length - validQuestions.length;
 
-    if (invalidFiltered > 0) {
-      console.warn(
-        `⚠️ Filtered out ${invalidFiltered} questions with wrong language`
-      );
-    }
 
-    console.log(
-      `✅ Returning ${validQuestions.length} valid questions for ${language}`
-    );
 
     // ✅ Enhanced response with language metadata
     res.json({
@@ -268,7 +239,6 @@ router.get('/questions', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Get questions error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch questions',
@@ -282,7 +252,6 @@ router.get('/questions', async (req, res) => {
 // ✅ ENHANCED LANGUAGES API with metadata
 router.get('/languages', async (req, res) => {
   try {
-    console.log('🌐 Fetching available languages...');
 
     let Questions;
     try {
@@ -318,7 +287,6 @@ router.get('/languages', async (req, res) => {
     const availableLanguages =
       languages.length > 0 ? languages : ['english', 'spanish', 'french'];
 
-    console.log('✅ Languages found:', availableLanguages);
 
     // ✅ Create language counts object
     const languageCountsObj = languageCounts.reduce((acc, item) => {
@@ -341,7 +309,6 @@ router.get('/languages', async (req, res) => {
       fallback: languages.length === 0,
     });
   } catch (error) {
-    console.error('❌ Get languages error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch languages',
@@ -358,11 +325,6 @@ router.get('/subcategories/:category', async (req, res) => {
     const { category } = req.params;
     const { language } = req.query;
 
-    console.log(
-      `📂 Fetching subcategories for category: ${category}, language: ${
-        language || 'all'
-      }`
-    );
 
     let Questions;
     try {
@@ -385,9 +347,6 @@ router.get('/subcategories/:category', async (req, res) => {
 
     const subcategories = await Questions.distinct('subCategory', filter);
 
-    console.log(
-      `✅ Found ${subcategories.length} subcategories for ${category}`
-    );
 
     res.json({
       success: true,
@@ -397,7 +356,6 @@ router.get('/subcategories/:category', async (req, res) => {
       language: language || 'all',
     });
   } catch (error) {
-    console.error('❌ Get subcategories error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch subcategories',
@@ -410,7 +368,6 @@ router.get('/subcategories/:category', async (req, res) => {
 // ✅ NEW: QUIZ STATS API with language breakdown
 router.get('/stats', async (req, res) => {
   try {
-    console.log('📊 Fetching quiz statistics...');
 
     let Questions;
     try {
@@ -486,7 +443,6 @@ router.get('/stats', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Get stats error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch quiz statistics',
@@ -504,7 +460,6 @@ router.get('/get-question', authenticateToken, getQuestion);
 // ✅ GET ALL QUIZZES - Admin Management
 router.get('/manage-quizzes', authenticateToken, async (req, res) => {
   try {
-    console.log('🔍 Fetching all quizzes for management...');
 
     // ✅ Admins can access all quizzes, no personal filtering
     const quizzes = await Quiz.find({})
@@ -512,7 +467,6 @@ router.get('/manage-quizzes', authenticateToken, async (req, res) => {
       .populate('language', 'name') // Populate language name
       .lean();
 
-    console.log(`✅ Found ${quizzes.length} quizzes`);
 
     res.json({
       success: true,
@@ -528,7 +482,6 @@ router.get('/manage-quizzes', authenticateToken, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Get quizzes error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch quizzes',
@@ -552,16 +505,6 @@ router.post('/manage-quizzes', authenticateToken, async (req, res) => {
       passPercentage,
     } = req.body;
 
-    console.log('🆕 Creating new quiz with data:', {
-      title,
-      description,
-      category,
-      language,
-      questions,
-      examType,
-      duration,
-      passPercentage,
-    });
 
     // ✅ Basic validation
     if (
@@ -602,7 +545,6 @@ router.post('/manage-quizzes', authenticateToken, async (req, res) => {
       data: newQuiz,
     });
   } catch (error) {
-    console.error('❌ Create quiz error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create quiz',
@@ -621,10 +563,6 @@ router.put(
     try {
       const { quizIds, newCategory } = req.body;
 
-      console.log('🔄 Bulk updating categories for quizzes:', {
-        quizIds,
-        newCategory,
-      });
 
       // ✅ Validate input
       if (!Array.isArray(quizIds) || quizIds.length === 0 || !newCategory) {
@@ -641,7 +579,6 @@ router.put(
         { $set: { category: newCategory, updatedAt: new Date() } }
       );
 
-      console.log(`✅ Updated ${result.nModified} quizzes`);
 
       res.json({
         success: true,
@@ -649,7 +586,6 @@ router.put(
         data: result,
       });
     } catch (error) {
-      console.error('❌ Bulk update categories error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to update categories',
@@ -667,7 +603,6 @@ router.delete(
     try {
       const { quizIds } = req.body;
 
-      console.log('🗑️ Bulk deleting quizzes:', quizIds);
 
       // ✅ Validate input
       if (!Array.isArray(quizIds) || quizIds.length === 0) {
@@ -681,7 +616,6 @@ router.delete(
       // ✅ Delete quizzes in bulk
       const result = await Quiz.deleteMany({ _id: { $in: quizIds } });
 
-      console.log(`✅ Deleted ${result.deletedCount} quizzes`);
 
       res.json({
         success: true,
@@ -689,7 +623,6 @@ router.delete(
         data: result,
       });
     } catch (error) {
-      console.error('❌ Bulk delete quizzes error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to delete quizzes',
@@ -707,7 +640,6 @@ router.delete(
     try {
       const { quizId } = req.params;
 
-      console.log('🗑️ Deleting quiz with ID:', quizId);
 
       // ✅ Delete quiz by ID
       const result = await Quiz.findByIdAndDelete(quizId);
@@ -726,7 +658,6 @@ router.delete(
         data: result,
       });
     } catch (error) {
-      console.error('❌ Delete quiz error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to delete quiz',
@@ -742,7 +673,6 @@ router.put('/manage-quizzes/:quizId', authenticateToken, async (req, res) => {
     const { quizId } = req.params;
     const updateData = req.body;
 
-    console.log('🔄 Updating quiz with ID:', quizId, 'Data:', updateData);
 
     // ✅ Update quiz by ID
     const result = await Quiz.findByIdAndUpdate(
@@ -770,7 +700,6 @@ router.put('/manage-quizzes/:quizId', authenticateToken, async (req, res) => {
       data: result,
     });
   } catch (error) {
-    console.error('❌ Update quiz error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update quiz',
@@ -784,7 +713,6 @@ router.get('/manage-quizzes/:quizId', authenticateToken, async (req, res) => {
   try {
     const { quizId } = req.params;
 
-    console.log('🔍 Fetching quiz details for ID:', quizId);
 
     // ✅ Get quiz by ID
     const quiz = await Quiz.findById(quizId)
@@ -806,7 +734,6 @@ router.get('/manage-quizzes/:quizId', authenticateToken, async (req, res) => {
       data: quiz,
     });
   } catch (error) {
-    console.error('❌ Get quiz details error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch quiz details',
@@ -823,8 +750,6 @@ router.get('/student-submissions', authenticateToken, async (req, res) => {
   try {
     const { status, category, language, page = 1, limit = 20 } = req.query;
 
-    console.log('📋 Fetching student quiz submissions...');
-    console.log('🔍 Filters:', { status, category, language });
 
     // Build filter query
     const filter = {};
@@ -846,9 +771,6 @@ router.get('/student-submissions', authenticateToken, async (req, res) => {
     // Get total count for pagination
     const totalCount = await StudentQuiz.countDocuments(filter);
 
-    console.log(
-      `📊 Found ${submissions.length} submissions (${totalCount} total)`
-    );
 
     // Transform data
     const transformedSubmissions = submissions.map((submission) => ({
@@ -905,7 +827,6 @@ router.get('/student-submissions', authenticateToken, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Fetch student submissions error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch student submissions',
@@ -922,7 +843,6 @@ router.put(
     try {
       const { submissionIds } = req.body;
 
-      console.log('✅ Bulk approving student submissions:', submissionIds);
 
       // ✅ Validate input
       if (!Array.isArray(submissionIds) || submissionIds.length === 0) {
@@ -939,7 +859,6 @@ router.put(
         { $set: { status: 'approved', updatedAt: new Date() } }
       );
 
-      console.log(`✅ Approved ${result.nModified} submissions`);
 
       res.json({
         success: true,
@@ -947,7 +866,6 @@ router.put(
         data: result,
       });
     } catch (error) {
-      console.error('❌ Bulk approve submissions error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to approve submissions',
@@ -965,7 +883,6 @@ router.put(
     try {
       const { submissionIds } = req.body;
 
-      console.log('❌ Bulk rejecting student submissions:', submissionIds);
 
       // ✅ Validate input
       if (!Array.isArray(submissionIds) || submissionIds.length === 0) {
@@ -982,7 +899,6 @@ router.put(
         { $set: { status: 'rejected', updatedAt: new Date() } }
       );
 
-      console.log(`✅ Rejected ${result.nModified} submissions`);
 
       res.json({
         success: true,
@@ -990,7 +906,6 @@ router.put(
         data: result,
       });
     } catch (error) {
-      console.error('❌ Bulk reject submissions error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to reject submissions',
@@ -1008,7 +923,6 @@ router.delete(
     try {
       const { submissionIds } = req.body;
 
-      console.log('🗑️ Bulk deleting student submissions:', submissionIds);
 
       // ✅ Validate input
       if (!Array.isArray(submissionIds) || submissionIds.length === 0) {
@@ -1024,7 +938,6 @@ router.delete(
         _id: { $in: submissionIds },
       });
 
-      console.log(`✅ Deleted ${result.deletedCount} submissions`);
 
       res.json({
         success: true,
@@ -1032,7 +945,6 @@ router.delete(
         data: result,
       });
     } catch (error) {
-      console.error('❌ Bulk delete submissions error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to delete submissions',
@@ -1048,7 +960,6 @@ router.get(
   authenticateToken,
   async (req, res) => {
     try {
-      console.log('📊 Fetching moderation statistics...');
 
       // ✅ Total submissions
       const totalSubmissions = await StudentQuiz.countDocuments();
@@ -1079,7 +990,6 @@ router.get(
         },
       });
     } catch (error) {
-      console.error('❌ Get moderation stats error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch moderation statistics',
@@ -1101,13 +1011,6 @@ router.post('/student-submissions', authenticateToken, async (req, res) => {
       submittedAt,
     } = req.body;
 
-    console.log('📥 Submitting new quiz:', {
-      quizId,
-      userId,
-      answers,
-      duration,
-      submittedAt,
-    });
 
     // ✅ Basic validation
     if (!quizId || !userId || !answers || answers.length === 0) {
@@ -1138,7 +1041,6 @@ router.post('/student-submissions', authenticateToken, async (req, res) => {
       data: newSubmission,
     });
   } catch (error) {
-    console.error('❌ Submit quiz error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to submit quiz',
@@ -1158,13 +1060,6 @@ router.post('/submit-quiz', authenticateToken, async (req, res) => {
       submittedAt,
     } = req.body;
 
-    console.log('📥 Submitting quiz with analytics:', {
-      quizId,
-      userId,
-      answers,
-      duration,
-      submittedAt,
-    });
 
     // ✅ Basic validation
     if (!quizId || !userId || !answers || answers.length === 0) {
@@ -1218,7 +1113,6 @@ router.post('/submit-quiz', authenticateToken, async (req, res) => {
       data: newSubmission,
     });
   } catch (error) {
-    console.error('❌ Submit quiz with analytics error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to submit quiz or update analytics',
@@ -1232,7 +1126,6 @@ router.get('/category-stats/:category', authenticateToken, async (req, res) => {
   try {
     const { category } = req.params;
 
-    console.log('📊 Fetching quiz statistics for category:', category);
 
     // ✅ Get total quizzes in category
     const totalQuizzes = await Quiz.countDocuments({ category });
@@ -1269,7 +1162,6 @@ router.get('/category-stats/:category', authenticateToken, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Get category stats error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch category statistics',
@@ -1284,7 +1176,6 @@ router.get('/my-history', authenticateToken, async (req, res) => {
   try {
     const { userId } = req;
 
-    console.log('📜 Fetching quiz history for user ID:', userId);
 
     // ✅ Get user's quiz submissions
     const history = await StudentQuiz.find({ userId })
@@ -1292,7 +1183,6 @@ router.get('/my-history', authenticateToken, async (req, res) => {
       .sort({ submittedAt: -1 }) // Latest first
       .lean();
 
-    console.log(`✅ Found ${history.length} history records`);
 
     res.json({
       success: true,
@@ -1301,7 +1191,6 @@ router.get('/my-history', authenticateToken, async (req, res) => {
       total: history.length,
     });
   } catch (error) {
-    console.error('❌ Get quiz history error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch quiz history',

@@ -33,9 +33,6 @@ class SessionService {
         }
         
         await session.save();
-        console.log(
-          `🔄 Reusing active session for user ${userId}: ${session.sessionId} (new expiry: ${expireAt})`
-        );
         return session;
       }
 
@@ -59,12 +56,8 @@ class SessionService {
 
       await session.save();
 
-      console.log(
-        `📝 Session created for user ${userId}: ${sessionId} (expires: ${expireAt})`
-      );
       return session;
     } catch (error) {
-      console.error('❌ Session creation failed:', error);
       throw new Error('Failed to create session');
     }
   }
@@ -81,7 +74,6 @@ class SessionService {
 
       return session;
     } catch (error) {
-      console.error('❌ Session lookup failed:', error);
       return null;
     }
   }
@@ -109,14 +101,10 @@ class SessionService {
       ).populate('userId', '-password');
 
       if (session) {
-        console.log(
-          `🔄 Session refreshed: ${sessionId} (new expiry: ${newExpireAt})`
-        );
       }
 
       return session;
     } catch (error) {
-      console.error('❌ Session refresh failed:', error);
       return null;
     }
   }
@@ -133,34 +121,29 @@ class SessionService {
       }).populate('userId', '-password');
 
       if (!session || !session.encryptedCredentials) {
-        console.log('🔴 No auto-auth data available for session:', sessionId);
         return null;
       }
 
       // Decrypt stored credentials
       const credentials = session.getDecryptedCredentials();
       if (!credentials || !credentials.email || !credentials.hashedPassword) {
-        console.log('🔴 Invalid credentials in session:', sessionId);
         return null;
       }
 
       // Verify user still exists and is active
       const user = session.userId;
       if (!user || !user.isVerified) {
-        console.log('🔴 User not found or not verified for auto-auth');
         return null;
       }
 
       // Verify the stored password hash matches current user password
       if (user.password !== credentials.hashedPassword) {
-        console.log('🔴 Stored password hash mismatch - password was changed');
         // Clear invalid credentials
         session.encryptedCredentials = null;
         await session.save();
         return null;
       }
 
-      console.log('✅ Auto-authentication successful for user:', user.email);
       
       // Refresh session
       await SessionService.refreshSession(sessionId);
@@ -171,7 +154,6 @@ class SessionService {
         method: 'auto-auth'
       };
     } catch (error) {
-      console.error('❌ Auto-authentication failed:', error);
       return null;
     }
   }
@@ -184,12 +166,10 @@ class SessionService {
       const result = await Session.deleteOne({ sessionId });
 
       if (result.deletedCount > 0) {
-        console.log(`🗑️ Session deleted: ${sessionId}`);
         return true;
       }
       return false;
     } catch (error) {
-      console.error('❌ Session deletion failed:', error);
       return false;
     }
   }
@@ -200,12 +180,8 @@ class SessionService {
   static async revokeAllUserSessions(userId) {
     try {
       const result = await Session.deleteMany({ userId });
-      console.log(
-        `🚫 Revoked ${result.deletedCount} sessions for user ${userId}`
-      );
       return result.deletedCount;
     } catch (error) {
-      console.error('❌ Session revocation failed:', error);
       return 0;
     }
   }
@@ -220,7 +196,6 @@ class SessionService {
         expireAt: { $gt: new Date() },
       }).sort({ lastAccessed: -1 });
     } catch (error) {
-      console.error('❌ Get user sessions failed:', error);
       return [];
     }
   }
@@ -281,12 +256,6 @@ class SessionService {
       }
     }
 
-    // Log if mobile and Android or iOS
-    if (platform === 'Mobile' && (os === 'Android' || os === 'iOS')) {
-      console.log(
-        `📱 Mobile session detected: OS=${os}, Browser=${browser}, UA=${userAgent}`
-      );
-    }
 
     return { platform, browser, os, userAgent };
   }

@@ -304,45 +304,33 @@ async function insertData() {
   try {
     // Connect to MongoDB
     await client.connect();
-    console.log("✅ Connected to MongoDB");
     
     const db = client.db(dbName);
     
     // Drop existing collections (optional - remove if you want to keep existing data)
-    console.log("🧹 Dropping existing collections...");
     try {
       await db.collection('countries').drop();
     } catch (e) {
-      console.log("Countries collection doesn't exist yet");
     }
     try {
       await db.collection('educationalstatuses').drop();
     } catch (e) {
-      console.log("Educational statuses collection doesn't exist yet");
     }
     try {
       await db.collection('specialties').drop();
     } catch (e) {
-      console.log("Specialties collection doesn't exist yet");
     }
     
     // Insert Countries
-    console.log("🌍 Inserting countries...");
     const countriesResult = await db.collection('countries').insertMany(COUNTRY_DATA);
-    console.log(`✅ Inserted ${countriesResult.insertedCount} countries`);
     
     // Insert Educational Statuses
-    console.log("🎓 Inserting educational statuses...");
     const educationResult = await db.collection('educationalstatuses').insertMany(EDUCATIONAL_STATUS_DATA);
-    console.log(`✅ Inserted ${educationResult.insertedCount} educational statuses`);
     
     // Insert Specialties
-    console.log("⚕️ Inserting specialties...");
     const specialtiesResult = await db.collection('specialties').insertMany(SPECIALTY_DATA);
-    console.log(`✅ Inserted ${specialtiesResult.insertedCount} specialties`);
     
     // Create indexes
-    console.log("📑 Creating indexes...");
     await db.collection('countries').createIndex({ label: "text" });
     await db.collection('countries').createIndex({ value: 1 });
     await db.collection('countries').createIndex({ countryId: 1 });
@@ -356,26 +344,16 @@ async function insertData() {
     await db.collection('specialties').createIndex({ category: 1 });
     await db.collection('specialties').createIndex({ specialtyId: 1 });
     
-    console.log("✅ Indexes created successfully");
     
     // Verify the data
     const countriesCount = await db.collection('countries').countDocuments();
     const educationCount = await db.collection('educationalstatuses').countDocuments();
     const specialtiesCount = await db.collection('specialties').countDocuments();
     
-    console.log("\n📊 Database Statistics:");
-    console.log(`Countries: ${countriesCount}`);
-    console.log(`Educational Statuses: ${educationCount}`);
-    console.log(`Specialties: ${specialtiesCount}`);
-    
-    console.log("\n🎉 All data inserted successfully!");
-    
   } catch (error) {
-    console.error("❌ Error inserting data:", error);
   } finally {
     // Close connection
     await client.close();
-    console.log("\n👋 Disconnected from MongoDB");
   }
 }
 

@@ -8,7 +8,6 @@ router.get("/", async (req, res) => {
   try {
     const { category, search } = req.query;
     
-    console.log("⚕️ Fetching specialties...", { category, search });
     
     let query = { isActive: true };
     
@@ -36,7 +35,6 @@ router.get("/", async (req, res) => {
       .sort({ label: 1 })
       .lean();
     
-    console.log(`✅ Found ${specialties.length} specialties`);
     
     res.status(200).json({
       success: true,
@@ -46,7 +44,6 @@ router.get("/", async (req, res) => {
     });
     
   } catch (error) {
-    console.error("❌ Error fetching specialties:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch specialties",
@@ -60,7 +57,6 @@ router.get("/by-category/:category", async (req, res) => {
   try {
     const { category } = req.params;
     
-    console.log(`🔍 Fetching specialties for category: "${category}"`);
     
     const validCategories = ['physician', 'resident', 'healthcare'];
     
@@ -77,7 +73,6 @@ router.get("/by-category/:category", async (req, res) => {
       .sort({ label: 1 })
       .lean();
     
-    console.log(`✅ Found ${specialties.length} ${category} specialties`);
     
     res.status(200).json({
       success: true,
@@ -87,7 +82,6 @@ router.get("/by-category/:category", async (req, res) => {
     });
     
   } catch (error) {
-    console.error("❌ Error fetching specialties by category:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch specialties",

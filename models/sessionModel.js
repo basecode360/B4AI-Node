@@ -103,7 +103,6 @@ sessionSchema.methods.getDecryptedCredentials = function () {
 
     return JSON.parse(decrypted);
   } catch (error) {
-    console.error('❌ Failed to decrypt credentials:', error);
     return null;
   }
 };

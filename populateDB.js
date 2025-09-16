@@ -26,9 +26,7 @@ const University = mongoose.model('University', universitySchema);
 // Quick population function
 async function quickPopulate() {
   try {
-    console.log('🚀 Connecting to MongoDB...');
     await mongoose.connect(MONGODB_URI);
-    console.log('✅ Connected to MongoDB');
 
     // Sample CSV content (you can replace this with your actual CSV file path)
     const csvFilePath = './universities.csv';
@@ -39,7 +37,6 @@ async function quickPopulate() {
       skipEmptyLines: true
     });
 
-    console.log(`📊 Processing ${parseResult.data.length} universities...`);
 
     let inserted = 0;
     let duplicates = 0;
@@ -53,7 +50,6 @@ async function quickPopulate() {
         let website = row.website?.trim();
 
         if (!name || !country) {
-          console.log(`❌ Skipping row with missing data: ${name || 'NO_NAME'} in ${country || 'NO_COUNTRY'}`);
           errors++;
           continue;
         }
@@ -81,43 +77,28 @@ async function quickPopulate() {
 
         // Try to insert
         await University.create(universityDoc);
-        console.log(`✅ Inserted: ${name} (${country})`);
         inserted++;
 
       } catch (error) {
         if (error.code === 11000) {
           // Duplicate key error
-          console.log(`⚠️  Duplicate: ${row.university} in ${row.country}`);
           duplicates++;
         } else {
-          console.error(`❌ Error inserting ${row.university}:`, error.message);
           errors++;
         }
       }
     }
 
     // Final stats
-    console.log('\n🎉 POPULATION COMPLETED!');
-    console.log('========================');
-    console.log(`✅ Successfully inserted: ${inserted}`);
-    console.log(`⚠️  Duplicates skipped: ${duplicates}`);
-    console.log(`❌ Errors: ${errors}`);
-    console.log('========================\n');
 
     // Show some results
     const totalCount = await University.countDocuments();
     const countries = await University.distinct('country');
     
-    console.log(`📊 Database now contains:`);
-    console.log(`   - ${totalCount} universities`);
-    console.log(`   - ${countries.length} countries`);
-    console.log(`   - Countries: ${countries.slice(0, 5).join(', ')}${countries.length > 5 ? '...' : ''}`);
 
   } catch (error) {
-    console.error('💥 Population failed:', error);
   } finally {
     await mongoose.disconnect();
-    console.log('🔌 Disconnected from MongoDB');
   }
 }
 

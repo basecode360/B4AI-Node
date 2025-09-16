@@ -45,18 +45,14 @@ class JWTService {
 
       // Ensure it's an access token (if tokenType is present)
       if (decoded.tokenType && decoded.tokenType !== 'access') {
-        console.log('🔴 Invalid token type:', decoded.tokenType);
         return null;
       }
 
       return decoded;
     } catch (error) {
       if (error.name === 'TokenExpiredError') {
-        console.log('🔴 JWT expired:', error.message);
       } else if (error.name === 'JsonWebTokenError') {
-        console.log('🔴 JWT invalid:', error.message);
       } else {
-        console.log('🔴 JWT verification failed:', error.message);
       }
       return null;
     }

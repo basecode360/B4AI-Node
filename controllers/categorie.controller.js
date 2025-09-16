@@ -13,7 +13,6 @@ export const getCategories = async (req, res) => {
         count: categories.length
       });
     } catch (error) {
-      console.error('❌ Error fetching categories:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch categories',

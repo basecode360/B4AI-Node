@@ -13,7 +13,6 @@ export const getSubCategories = async (req, res) => {
             count: subcategories.length
         });
     } catch (error) {
-        console.error('❌ Error fetching subcategories:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to fetch subcategories',

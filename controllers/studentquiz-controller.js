@@ -110,12 +110,6 @@ export const addQuestion = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Error adding question:', error);
-    console.error('🔍 Error details:', {
-      message: error.message,
-      stack: error.stack,
-    });
-
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -181,7 +175,6 @@ export const getAllQuestions = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error fetching questions:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -213,7 +206,6 @@ export const getQuestionById = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error fetching question:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -268,7 +260,6 @@ export const updateQuestion = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error updating question:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -314,7 +305,6 @@ export const deleteQuestion = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error deleting question:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -384,7 +374,6 @@ export const getCategories = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error fetching categories:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'

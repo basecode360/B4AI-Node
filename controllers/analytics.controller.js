@@ -22,8 +22,6 @@ const validateQuizData = (data) => {
 // Update analytics after quiz completion
 export const updateAnalytics = async (req, res) => {
   try {
-    console.log('📊 Analytics update request:', req.body);
-    console.log('👤 User ID:', req.user?.userId);
     
     const validationErrors = validateQuizData(req.body);
     if (validationErrors.length > 0) {
@@ -40,14 +38,12 @@ export const updateAnalytics = async (req, res) => {
     let analytics = await PerformanceAnalytics.findOne({ userId });
     
     if (!analytics) {
-      console.log('🆕 Creating new analytics record for user:', userId);
       analytics = new PerformanceAnalytics({ userId });
     }
     
     // Use the model method to update analytics
     await analytics.updateAfterQuiz(req.body);
     
-    console.log('✅ Analytics successfully updated');
     
     // Return updated stats
     return res.status(200).json({
@@ -64,7 +60,6 @@ export const updateAnalytics = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Analytics update error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to update analytics',
@@ -77,7 +72,6 @@ export const updateAnalytics = async (req, res) => {
 export const getUserStats = async (req, res) => {
   try {
     const userId = req.user.userId;
-    console.log('📈 Fetching stats for user:', userId);
     
     const analytics = await PerformanceAnalytics.findOne({ userId })
       .select('totalQuestionsAttempted totalCorrectQuestions cumulativeScore timeStats');
@@ -110,7 +104,6 @@ export const getUserStats = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Get user stats error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve stats',
@@ -195,7 +188,6 @@ export const getAllUsersAnalytics = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Admin analytics error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve admin stats',
@@ -307,7 +299,6 @@ export const getAdminSummary = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Admin summary error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve summary stats',
@@ -387,7 +378,6 @@ export const exportAnalytics = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Export error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to export analytics',

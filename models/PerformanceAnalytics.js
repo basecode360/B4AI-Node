@@ -334,25 +334,15 @@ performanceAnalyticsSchema.statics.updateWithLastQuiz = async function(userId, q
     markedQuestions = 0
   } = quizData;
   
-  console.log(`\n🔄 ============ ANALYTICS UPDATE START ============`);
-  console.log(`👤 User: ${userId}`);
-  console.log(`📝 Quiz Mode: ${quizMode}`);
-  console.log(`🎯 Questions: ${correctAnswers}/${totalQuestions}`);
-  console.log(`⏱️ Time: ${timeSpent}s`);
-  console.log(`📂 Category: ${category || 'None'}`);
   
   // Find existing analytics or create new
   const existingAnalytics = await this.findOne({ userId });
   
   if (existingAnalytics) {
-    console.log('📈 Updating existing analytics...');
-    console.log('🔍 Before update - cumulativeScore:', existingAnalytics.cumulativeScore);
-    console.log('🔍 Before update - TIMED quiz count:', existingAnalytics.quizCountByMode?.TIMED || 0);
     
     // 🔥 CALCULATE BB POINTS (ONLY FOR TIMED MODE) - Enhanced Formula
     let bbPointsEarned = 0;
     if (quizMode === 'TIMED' && questionTimes && questionTimes.length > 0) {
-      console.log('💰 Calculating BB Points for TIMED mode...');
       questionTimes.slice(0, correctAnswers).forEach((time, index) => {
         let points = 0;
         if (time < 5) points = 1;
@@ -361,26 +351,17 @@ performanceAnalyticsSchema.statics.updateWithLastQuiz = async function(userId, q
         else points = 0.25;
         
         bbPointsEarned += points;
-        console.log(`   Question ${index + 1}: ${time}s = ${points} points`);
       });
-      console.log(`💰 Total BB Points earned: ${bbPointsEarned}`);
     } else if (quizMode === 'TIMED') {
       // Fallback calculation if questionTimes not available
       const accuracyBonus = (correctAnswers / totalQuestions) * 100;
       const speedBonus = Math.max(0, 100 - (timeSpent / totalQuestions));
       bbPointsEarned = Math.round((accuracyBonus + speedBonus) / 10);
-      console.log('💰 BB Points calculation (fallback):', {
-        accuracyBonus: accuracyBonus.toFixed(2),
-        speedBonus: speedBonus.toFixed(2),
-        bbPointsEarned
-      });
     } else {
-      console.log(`❌ No BB Points for ${quizMode} mode`);
     }
     
     // Calculate current quiz score percentage
     const currentQuizScore = Math.round((correctAnswers / totalQuestions) * 100);
-    console.log(`📊 Current quiz score: ${currentQuizScore}%`);
     
     // Update general stats
     existingAnalytics.totalQuizzesTaken += 1;
@@ -405,12 +386,7 @@ performanceAnalyticsSchema.statics.updateWithLastQuiz = async function(userId, q
     // ✅ CRITICAL FIX: cumulativeScore SIRF TIMED mode se update ho
     if (quizMode === 'TIMED') {
       existingAnalytics.cumulativeScore += bbPointsEarned;
-      console.log('✅ BB Points added to cumulativeScore:', bbPointsEarned);
-      console.log('✅ New cumulativeScore:', existingAnalytics.cumulativeScore);
-      console.log('✅ New TIMED quiz count:', existingAnalytics.quizCountByMode.TIMED);
     } else {
-      console.log('❌ No BB Points added - Mode:', quizMode);
-      console.log('❌ cumulativeScore remains:', existingAnalytics.cumulativeScore);
     }
     
     // Update time per question stats
@@ -430,7 +406,6 @@ performanceAnalyticsSchema.statics.updateWithLastQuiz = async function(userId, q
         existingAnalytics.timePerQuestionStats.slowestTime = slowestTime;
       }
       
-      console.log(`⏱️ Updated time stats - Avg: ${existingAnalytics.timePerQuestionStats.averageTime.toFixed(2)}s, Fastest: ${existingAnalytics.timePerQuestionStats.fastestTime}s, Slowest: ${existingAnalytics.timePerQuestionStats.slowestTime}s`);
     }
     
     // 🆕 UPDATE CATEGORY PERFORMANCE (REQUIREMENTS: Premium feature)
@@ -451,7 +426,6 @@ performanceAnalyticsSchema.statics.updateWithLastQuiz = async function(userId, q
       categoryData.lastAttempted = new Date();
       
       existingAnalytics.categoryPerformance.set(categoryKey, categoryData);
-      console.log(`📂 Updated category "${category}": ${categoryData.accuracy}% accuracy, ${categoryData.totalQuizzes} quizzes`);
     }
     
     // 🆕 ADD TO PERFORMANCE TRENDS (Premium feature)
@@ -474,7 +448,6 @@ performanceAnalyticsSchema.statics.updateWithLastQuiz = async function(userId, q
       existingAnalytics.performanceTrends = existingAnalytics.performanceTrends.slice(-100);
     }
     
-    console.log(`📈 Added trend entry: ${currentQuizScore}% in ${quizMode} mode`);
     
     // Update last quiz data (Enhanced)
     existingAnalytics.lastQuiz = {
@@ -492,21 +465,10 @@ performanceAnalyticsSchema.statics.updateWithLastQuiz = async function(userId, q
     
     await existingAnalytics.save();
     
-    console.log('✅ Analytics updated successfully');
-    console.log('📊 Final analytics summary:');
-    console.log('   - Total Quizzes:', existingAnalytics.totalQuizzesTaken);
-    console.log('   - TIMED Quiz Count:', existingAnalytics.quizCountByMode.TIMED);
-    console.log('   - Total BB Points (cumulativeScore):', existingAnalytics.cumulativeScore);
-    console.log('   - Last Quiz Score:', existingAnalytics.lastQuizScore, '%');
-    console.log('   - Last Quiz Mode:', existingAnalytics.lastQuiz.quizMode);
-    console.log('   - Last Quiz BB Points:', existingAnalytics.lastQuiz.bbPointsEarned);
-    console.log('   - Categories Attempted:', existingAnalytics.categoryPerformance.size);
-    console.log(`====================================================\n`);
     
     return existingAnalytics;
     
   } else {
-    console.log('🆕 Creating new analytics...');
     
     // 🔥 CALCULATE BB POINTS for new user (ONLY FOR TIMED MODE)
     let bbPointsEarned = 0;
@@ -591,14 +553,6 @@ performanceAnalyticsSchema.statics.updateWithLastQuiz = async function(userId, q
     
     await newAnalytics.save();
     
-    console.log('✅ New analytics created successfully');
-    console.log('📊 New analytics summary:');
-    console.log('   - Initial cumulativeScore:', newAnalytics.cumulativeScore);
-    console.log('   - TIMED Quiz Count:', newAnalytics.quizCountByMode.TIMED);
-    console.log('   - Last Quiz Score:', newAnalytics.lastQuizScore, '%');
-    console.log('   - Quiz Mode:', newAnalytics.lastQuiz.quizMode);
-    console.log('   - BB Points earned:', newAnalytics.lastQuiz.bbPointsEarned);
-    console.log(`====================================================\n`);
     
     return newAnalytics;
   }
@@ -640,13 +594,6 @@ performanceAnalyticsSchema.statics.getUserAnalytics = async function(userId) {
     };
   }
   
-  console.log('📊 Returning user analytics:');
-  console.log('   - Total BB Points (cumulativeScore):', analytics.cumulativeScore);
-  console.log('   - Last Quiz Score:', analytics.lastQuizScore, '%');
-  console.log('   - TIMED Quiz Count:', analytics.quizCountByMode?.TIMED || 0);
-  console.log('   - Last Quiz BB Points:', analytics.lastQuiz?.bbPointsEarned || 0);
-  console.log('   - Last Quiz Mode:', analytics.lastQuiz?.quizMode || 'None');
-  console.log('   - Categories Attempted:', analytics.categoryPerformance.size);
   
   return {
     totalQuizzesTaken: analytics.totalQuizzesTaken,

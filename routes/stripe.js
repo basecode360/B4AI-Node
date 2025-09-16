@@ -51,7 +51,6 @@ router.post("/create-checkout-session", authenticateToken, async (req, res) => {
       cancel_url: `${process.env.FRONTEND_URL}/subscription`,
     });
 
-    console.log(`✅ Checkout session created for user: ${userId}`);
 
     res.json({ 
       success: true, 
@@ -59,7 +58,6 @@ router.post("/create-checkout-session", authenticateToken, async (req, res) => {
       url: session.url 
     });
   } catch (err) {
-    console.error("Stripe session error:", err);
     res.status(500).json({ 
       success: false, 
       message: "Failed to create checkout session",
@@ -103,7 +101,6 @@ router.post("/create-payment-intent", authenticateToken, async (req, res) => {
       description: `B4AI Premium - ${period} subscription for ${userEmail}`,
     });
 
-    console.log(`✅ Payment intent created for user: ${userId}, amount: $${amount/100}`);
 
     res.json({ 
       success: true, 
@@ -113,7 +110,6 @@ router.post("/create-payment-intent", authenticateToken, async (req, res) => {
       currency: paymentIntent.currency
     });
   } catch (err) {
-    console.error("Stripe payment intent error:", err);
     res.status(500).json({ 
       success: false, 
       message: "Failed to create payment intent",
@@ -129,15 +125,11 @@ router.post("/cancel-subscription", authenticateToken, async (req, res) => {
     const userId = req.user.userId;
     const { cancellationReason } = req.body;
     
-    console.log(`🚫 Cancellation request from user: ${userId}`);
-    console.log(`📝 Request body:`, req.body);
-    console.log(`👤 User from auth:`, req.user);
     
     // Find user and check if they have active subscription
     const user = await userModel.findById(userId);
     
     if (!user) {
-      console.log(`❌ User not found: ${userId}`);
       return res.status(404).json({
         success: false,
         message: "User not found",
@@ -145,12 +137,8 @@ router.post("/cancel-subscription", authenticateToken, async (req, res) => {
       });
     }
     
-    console.log(`✅ User found: ${user.email}`);
-    console.log(`💰 Has paid: ${user.hasPaid}`);
-    console.log(`📋 Subscription details:`, user.subscriptionDetails);
     
     if (!user.hasPaid || !user.subscriptionDetails) {
-      console.log(`❌ No active subscription found for user: ${userId}`);
       return res.status(400).json({
         success: false,
         message: "No active subscription found",
@@ -160,10 +148,8 @@ router.post("/cancel-subscription", authenticateToken, async (req, res) => {
     
     // ✅ FIXED: Check if subscription status exists and is not already cancelled
     const currentStatus = user.subscriptionDetails.status || "active";
-    console.log(`📊 Current subscription status: ${currentStatus}`);
     
     if (currentStatus === "cancelled") {
-      console.log(`❌ Subscription already cancelled for user: ${userId}`);
       return res.status(400).json({
         success: false,
         message: "Subscription is already cancelled",
@@ -188,9 +174,6 @@ router.post("/cancel-subscription", authenticateToken, async (req, res) => {
     
     const remainingDays = Math.max(0, Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24)));
     
-    console.log(`📅 Payment date: ${paymentDate}`);
-    console.log(`📅 Calculated expiry: ${expiryDate}`);
-    console.log(`📊 Remaining days: ${remainingDays}`);
     
     // ✅ FIXED: Use proper update syntax for nested fields
     const updateData = {
@@ -201,7 +184,6 @@ router.post("/cancel-subscription", authenticateToken, async (req, res) => {
       "subscriptionDetails.expiryDate": expiryDate
     };
     
-    console.log(`🔄 Updating user with data:`, updateData);
     
     // Update subscription status
     const updatedUser = await userModel.findByIdAndUpdate(
@@ -211,7 +193,6 @@ router.post("/cancel-subscription", authenticateToken, async (req, res) => {
     );
     
     if (!updatedUser) {
-      console.log(`❌ Failed to update user: ${userId}`);
       return res.status(500).json({
         success: false,
         message: "Failed to update subscription status",
@@ -219,8 +200,6 @@ router.post("/cancel-subscription", authenticateToken, async (req, res) => {
       });
     }
     
-    console.log(`✅ Subscription cancelled for user: ${userId}`);
-    console.log(`✅ Updated subscription status: ${updatedUser.subscriptionDetails.status}`);
     
     res.json({
       success: true,
@@ -234,8 +213,6 @@ router.post("/cancel-subscription", authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("❌ Cancel subscription error:", error);
-    console.error("❌ Error stack:", error.stack);
     res.status(500).json({
       success: false,
       message: "Failed to cancel subscription",
@@ -256,13 +233,6 @@ router.post("/webhook", async (req, res) => {
     });
   }
 
-  // DEBUG: Log webhook details
-  console.log("🔍 Webhook Debug Info:");
-  console.log("📝 Signature header:", sig);
-  console.log("🔑 Webhook secret (first 10 chars):", process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 10) + "...");
-  console.log("📦 Body type:", typeof req.body);
-  console.log("📏 Body length:", req.body.length);
-  console.log("🏷️ Body preview:", req.body.toString().substring(0, 100) + "...");
 
   try {
     // req.body should now be a Buffer/string, not a parsed object
@@ -272,18 +242,14 @@ router.post("/webhook", async (req, res) => {
       process.env.STRIPE_WEBHOOK_SECRET
     );
 
-    console.log(`🔔 Webhook received: ${event.type}`);
 
     // Handle the event
     switch (event.type) {
       case "payment_intent.succeeded":
         const paymentIntent = event.data.object;
-        console.log(`💰 Payment Intent Succeeded: ${paymentIntent.id}`);
-        console.log(`📦 Metadata:`, paymentIntent.metadata);
         
         // Check if this payment intent has metadata
         if (paymentIntent.metadata && paymentIntent.metadata.userId) {
-          console.log(`🔍 Updating user: ${paymentIntent.metadata.userId}`);
           
           try {
             // Update user payment status
@@ -306,41 +272,29 @@ router.post("/webhook", async (req, res) => {
               { new: true }
             );
 
-            if (piUpdateResult) {
-              console.log(`✅ Payment successful for user: ${paymentIntent.metadata.userId}`);
-              console.log(`💾 Updated user hasPaid:`, piUpdateResult.hasPaid);
-            } else {
-              console.error(`❌ Failed to update payment status for user: ${paymentIntent.metadata.userId}`);
-            }
           } catch (error) {
-            console.error(`❌ Error updating user:`, error);
           }
         }
         break;
 
       case "payment_intent.created":
-        console.log(`📝 Payment intent created: ${event.data.object.id}`);
         // This is just informational, no action needed
         break;
 
       case "checkout.session.completed":
         const session = event.data.object;
-        console.log(`✅ Checkout session completed: ${session.id}`);
         // Your existing checkout session handling code...
         break;
 
       case "payment_intent.payment_failed":
         const failedPayment = event.data.object;
-        console.log(`❌ Payment failed: ${failedPayment.id}`);
         break;
 
       default:
-        console.log(`⚠️ Unhandled event type: ${event.type}`);
     }
 
     res.json({ received: true });
   } catch (err) {
-    console.error("Webhook error:", err);
     res.status(400).json({
       success: false,
       message: `Webhook Error: ${err.message}`
@@ -353,7 +307,6 @@ router.post("/reactivate-subscription", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     
-    console.log(`🔄 Reactivation request from user: ${userId}`);
     
     const user = await userModel.findById(userId);
     
@@ -393,7 +346,6 @@ router.post("/reactivate-subscription", authenticateToken, async (req, res) => {
       "subscriptionDetails.cancellationReason": null
     });
     
-    console.log(`✅ Subscription reactivated for user: ${userId}`);
     
     res.json({
       success: true,
@@ -405,7 +357,6 @@ router.post("/reactivate-subscription", authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("Reactivate subscription error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to reactivate subscription",
@@ -470,7 +421,6 @@ router.get("/payment-status", authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("Payment status error:", error);
     res.status(500).json({ 
       success: false, 
       message: "Error checking payment status",
@@ -495,7 +445,7 @@ router.get("/payment-status", authenticateToken, async (req, res) => {
 //       message: "Subscription cancelled successfully"
 //     });
 //   } catch (error) {
-//     console.error("Cancel subscription error:", error);
+//
 //     res.status(500).json({
 //       success: false,
 //       message: "Failed to cancel subscription",

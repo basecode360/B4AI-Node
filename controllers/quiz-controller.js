@@ -109,7 +109,6 @@ Remember: First option should always be correct!
     // If parsing fails, return smart fallback with randomization
     return getSmartFallbackWithRandomization(question);
   } catch (error) {
-    console.error("Gemini Error:", error.message);
     return getSmartFallbackWithRandomization(question);
   }
 };
@@ -233,7 +232,6 @@ const addQuestion = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error adding question:", error);
     res.status(500).json({
       success: false,
       message: "Server error",
@@ -285,7 +283,6 @@ const addCategory = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error updating category:", error);
     res.status(500).json({
       success: false,
       message: "Server error",

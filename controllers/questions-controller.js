@@ -172,7 +172,6 @@ const parseExcelSheetWithDetails = (workbook, config) => {
           
           // Debug log for first few questions
           if (index < 5) {
-            console.log(`[${config.language}] Row ${index + 2} - Approved: "${approvedCell}" (type: ${typeof approvedCell}) => ${approvedValue}`);
           }
         }
       }
@@ -196,13 +195,11 @@ const parseExcelSheetWithDetails = (workbook, config) => {
       parsedQuestions.push(questionData);
       
     } catch (error) {
-      console.error(`Error parsing row ${index + 2} in ${config.sheetName}:`, error.message);
     }
   });
 
   // Log summary of approved status
   const approvedCount = parsedQuestions.filter(q => q.approved).length;
-  console.log(`[${config.language}] Parsed ${parsedQuestions.length} questions, ${approvedCount} approved`);
 
   return parsedQuestions;
 };
@@ -210,7 +207,6 @@ const parseExcelSheetWithDetails = (workbook, config) => {
 // Import Excel questions - FIXED VERSION
 export const importExcelQuestions = async (req, res) => {
   try {
-    console.log('📊 Import Excel questions called');
     
     // Check if user is authenticated
     if (!req.user || !req.user.userId) {
@@ -226,7 +222,6 @@ export const importExcelQuestions = async (req, res) => {
     
     if (isForceImport) {
       // Handle force import of skipped questions
-      console.log('🔄 Force import requested');
       
       let skippedQuestions = [];
       try {
@@ -275,7 +270,6 @@ export const importExcelQuestions = async (req, res) => {
             
             if (updated) {
               imported++;
-              console.log(`✅ Force updated question with approved=${updated.approved}`);
             } else {
               failed++;
             }
@@ -298,10 +292,8 @@ export const importExcelQuestions = async (req, res) => {
 
             await newQuestion.save({ validateBeforeSave: false });
             imported++;
-            console.log(`✅ Force created question with approved=${newQuestion.approved}`);
           }
         } catch (error) {
-          console.error(`Failed to force import question: ${error.message}`);
           errors.push(`${skippedQuestion.question?.substring(0, 50)}...: ${error.message}`);
           failed++;
         }
@@ -331,16 +323,12 @@ export const importExcelQuestions = async (req, res) => {
       try {
         selectedLanguages = JSON.parse(req.body.languages);
       } catch (error) {
-        console.error('Error parsing languages:', error);
       }
     }
 
-    console.log('Selected languages:', selectedLanguages);
-    console.log('Uploaded file:', req.file.filename);
 
     // Read the Excel file
     const workbook = XLSX.readFile(req.file.path);
-    console.log('Available sheets:', workbook.SheetNames);
 
     let totalImported = 0;
     let totalSkipped = 0;
@@ -352,7 +340,6 @@ export const importExcelQuestions = async (req, res) => {
     // Process each selected language
     for (const language of selectedLanguages) {
       try {
-        console.log(`\n🌍 Processing ${language} questions...`);
         
         const config = languageConfigs[language];
         if (!config) {
@@ -362,7 +349,6 @@ export const importExcelQuestions = async (req, res) => {
 
         // Parse questions from the sheet with enhanced data
         const questions = parseExcelSheetWithDetails(workbook, config);
-        console.log(`📝 Parsed ${questions.length} questions for ${language}`);
 
         if (questions.length === 0) {
           allErrors.push(`No valid questions found in ${config.sheetName}`);
@@ -370,9 +356,7 @@ export const importExcelQuestions = async (req, res) => {
         }
 
         // Log sample of parsed data for debugging
-        console.log(`Sample parsed data (first 3 questions):`);
         questions.slice(0, 3).forEach((q, i) => {
-          console.log(`  Q${i + 1}: approved=${q.approved}, question="${q.question.substring(0, 40)}..."`);
         });
 
         // Bulk import questions with enhanced tracking
@@ -392,14 +376,7 @@ export const importExcelQuestions = async (req, res) => {
           allImportedQuestions = allImportedQuestions.concat(result.importedQuestions);
         }
 
-        console.log(`✅ ${language} import result:`, {
-          imported: result.imported,
-          skipped: result.skipped,
-          duplicates: result.duplicates || 0
-        });
-        
       } catch (error) {
-        console.error(`Error processing ${language}:`, error.message);
         allErrors.push(`${language}: ${error.message}`);
       }
     }
@@ -408,7 +385,6 @@ export const importExcelQuestions = async (req, res) => {
     try {
       fs.unlinkSync(req.file.path);
     } catch (error) {
-      console.error('Error deleting uploaded file:', error);
     }
 
     // Prepare response
@@ -426,10 +402,6 @@ export const importExcelQuestions = async (req, res) => {
     }
 
     // Log final summary
-    console.log('\n📊 Import Summary:');
-    console.log(`  Total Imported: ${totalImported}`);
-    console.log(`  Total Skipped: ${totalSkipped}`);
-    console.log(`  Total Duplicates: ${totalDuplicates}`);
 
     res.status(success ? 200 : 400).json({
       success,
@@ -448,13 +420,11 @@ export const importExcelQuestions = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Import Excel error:', error);
     
     if (req.file && req.file.path) {
       try {
         fs.unlinkSync(req.file.path);
       } catch (cleanupError) {
-        console.error('Error cleaning up file:', cleanupError);
       }
     }
 
@@ -539,7 +509,6 @@ export const importExcelQuestions = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Get questions error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch questions',
@@ -576,7 +545,6 @@ const getApprovedQuestionStats = async () => {
       total: totalApproved
     };
   } catch (error) {
-    console.error('Error getting approved question stats:', error);
     return {
       approved: 0,
       categories: [],
@@ -619,7 +587,6 @@ const getStudentQuestionStats = async () => {
       total: totalPending
     };
   } catch (error) {
-    console.error('Error getting student question stats:', error);
     return {
       pending: 0,
       categories: [],
@@ -704,7 +671,6 @@ export const getAllStudentQuestions = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Get student questions error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch student questions',
@@ -787,7 +753,6 @@ export const getAllQuestions = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Get approved questions error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch approved questions',
@@ -848,7 +813,6 @@ export const getRandomQuestions = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Get random questions error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch random questions',
@@ -891,14 +855,12 @@ export const createQuestion = async (req, res) => {
     
     await newQuestion.populate('creator', 'name email role');
 
-    console.log(`✅ Created question with approved=${newQuestion.approved}`);
     res.status(201).json({
       success: true,
       message: 'Question created successfully',
       question: newQuestion,
     });
   } catch (error) {
-    console.error('❌ Create question error:', error);
     res.status(400).json({
       success: false,
       message: 'Failed to create question',
@@ -935,7 +897,6 @@ export const updateQuestion = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Update question error:', error);
     res.status(400).json({
       success: false,
       message: 'Failed to update question',
@@ -967,7 +928,6 @@ export const deleteQuestion = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Delete question error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete question',
@@ -1002,7 +962,6 @@ export const bulkUpdateQuestions = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Bulk update error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to bulk update questions',
@@ -1035,7 +994,6 @@ export const bulkDeleteQuestions = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Bulk delete error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to bulk delete questions',

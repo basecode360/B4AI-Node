@@ -30,20 +30,6 @@ const register = async (req, res) => {
       address, // Frontend sends this
     } = req.body;
 
-    console.log('📝 Registration data received from frontend:', {
-      email,
-      firstName,
-      lastName,
-      gender,
-      educationalStatus,
-      specialty,
-      institution,
-      country,
-      dateOfBirth,
-      dateOfGraduation,
-      address,
-    });
-
     // Validation
     if (!email || !password) {
       return res.status(400).json({
@@ -96,13 +82,6 @@ const register = async (req, res) => {
         });
         await newVerification.save();
 
-        console.log(
-          'first ==>',
-          existingUser.email,
-          verificationCode,
-          existingUser.profile.firstName
-        );
-
         // Send verification email
         await sendVerificationEmail(
           existingUser.email,
@@ -153,8 +132,6 @@ const register = async (req, res) => {
       instagramUrl: '',
     };
 
-    console.log('🔄 Mapped profile data for backend model:', profileData);
-
     // Create new user
     const newUser = new userModel({
       email: email.toLowerCase(),
@@ -163,15 +140,8 @@ const register = async (req, res) => {
       profile: profileData,
     });
 
-    console.log(
-      '🔍 User object before save:',
-      JSON.stringify(newUser.toObject(), null, 2)
-    );
-
     // Save user to database
     await newUser.save();
-
-    console.log('✅ User saved to database successfully with profile data');
 
     // Generate verification code
     const verificationCode = generateCode();
@@ -182,13 +152,6 @@ const register = async (req, res) => {
       verificationCode,
     });
     await newVerification.save();
-
-    console.log(
-      'second ==>',
-      newUser.email,
-      verificationCode,
-      newUser.profile.firstName
-    );
 
     // Send verification email
     try {
@@ -213,8 +176,6 @@ const register = async (req, res) => {
       verificationRequired: true,
     });
   } catch (error) {
-    console.error('Register error:', error);
-
     // Handle specific MongoDB errors
     if (error.code === 11000) {
       return res.status(409).json({
@@ -225,7 +186,6 @@ const register = async (req, res) => {
 
     // ✅ Enhanced error logging for validation issues
     if (error.name === 'ValidationError') {
-      console.error('❌ Validation Error Details:', error.errors);
       const errorMessages = Object.keys(error.errors).map(
         (key) => `${key}: ${error.errors[key].message}`
       );
@@ -320,7 +280,6 @@ const verifyEmail = async (req, res) => {
       token,
     });
   } catch (error) {
-    console.error('Verify email error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error during verification',
@@ -379,7 +338,6 @@ const resendVerificationCode = async (req, res) => {
       message: 'New verification code sent to your email',
     });
   } catch (error) {
-    console.error('Resend verification error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to resend verification code',
@@ -498,8 +456,6 @@ const loginEnhanced = async (req, res) => {
       isVerified: user.isVerified, // Will be true
     };
 
-    console.log(`✅ Enhanced login successful for user: ${user.email}, isVerified set to true`);
-
     return res.status(200).json({
       success: true,
       message: 'Login successful',
@@ -510,7 +466,6 @@ const loginEnhanced = async (req, res) => {
       tokenExpiration: JWTService.getTokenExpiration(accessToken),
     });
   } catch (error) {
-    console.error('❌ Enhanced login error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error during login',
@@ -525,8 +480,6 @@ const refreshToken = async (req, res) => {
   try {
     // Session ID extracted by middleware
     const sessionId = req.sessionId;
-
-    console.log(`🔄 Refresh token attempt for session: ${sessionId}`);
 
     // Find and refresh the session (sliding window)
     const session = await SessionService.refreshSession(sessionId);
@@ -550,8 +503,6 @@ const refreshToken = async (req, res) => {
 
     const newAccessToken = JWTService.generateAccessToken(tokenPayload);
 
-    console.log(`✅ Token refreshed for user: ${session.userId.email}`);
-
     return res.status(200).json({
       success: true,
       message: 'Token refreshed successfully',
@@ -561,7 +512,6 @@ const refreshToken = async (req, res) => {
       sessionExpiration: session.expireAt,
     });
   } catch (error) {
-    console.error('❌ Token refresh error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error during token refresh',
@@ -571,23 +521,11 @@ const refreshToken = async (req, res) => {
 };
 
 const logoutEnhanced = async (req, res) => {
-  // Add timestamp to match your console format
   const timestamp = new Date().toISOString();
-  console.log(`${timestamp} - POST /api/v1/auth/logout-enhanced`);
-  console.log('🚀 LOGOUT ENHANCED FUNCTION CALLED');
-  
   try {
-    // Log all possible sources of sessionId
-    console.log('🔍 Debug - req.body:', JSON.stringify(req.body, null, 2));
-    console.log('🔍 Debug - req.sessionId:', req.sessionId);
-    console.log('🔍 Debug - req.cookies:', req.cookies);
-    console.log('🔍 Debug - req.headers:', JSON.stringify(req.headers, null, 2));
-    
     // Get sessionId from request body (sent from frontend) or fallback to other sources
     const sessionId = req.body.sessionId || req.sessionId || req.cookies?.session_id;
     
-    console.log('🔍 Logout attempt with sessionId:', sessionId);
-
     let userId = null;
 
     // First try to get userId from JWT token in Authorization header
@@ -598,16 +536,13 @@ const logoutEnhanced = async (req, res) => {
         const decoded = jwt.decode(token);
         if (decoded && decoded.userId) {
           userId = decoded.userId;
-          console.log('✅ Retrieved userId from JWT token:', userId);
         }
       } catch (tokenError) {
-        console.log('❌ Error decoding JWT token:', tokenError.message);
       }
     }
 
     // If we have sessionId and still no userId, try to find the session
     if (sessionId && !userId) {
-      console.log('🔄 Attempting to find session with sessionId:', sessionId);
       try {
         // Try to find session using SessionService methods
         let foundSession = null;
@@ -621,34 +556,24 @@ const logoutEnhanced = async (req, res) => {
             (s.sessionId && s.sessionId.toString() === sessionId)
           );
           if (foundSession) {
-            console.log('✅ Found session via getAllSessions');
           }
         } catch (e) {
-          console.log('❌ getAllSessions failed:', e.message);
         }
         
         if (foundSession) {
           userId = foundSession.userId._id || foundSession.userId;
-          console.log('✅ Retrieved userId from session:', userId);
         } else {
-          console.log('❌ No session found with sessionId:', sessionId);
         }
       } catch (sessionError) {
-        console.error('❌ Error retrieving session:', sessionError.message);
-        console.error('❌ Full session error:', sessionError);
       }
     }
 
     // Fallback to auth middleware
     if (!userId) {
-      console.log('🔄 Trying fallback methods for userId...');
-      console.log('🔍 req.user:', req.user);
       userId = req.user?.userId || req.user?._id || req.userId;
-      console.log('🔄 Fallback - userId from auth middleware:', userId);
     }
 
     if (userId) {
-      console.log('🔄 Attempting to update user isVerified status...');
       try {
         const updateResult = await userModel.findByIdAndUpdate(
           userId,
@@ -658,41 +583,25 @@ const logoutEnhanced = async (req, res) => {
           },
           { new: true }
         );
-        
-        if (updateResult) {
-          console.log(`✅ User ${userId} isVerified set to false`);
-          console.log(`✅ Final isVerified status: ${updateResult.isVerified}`);
-        } else {
-          console.log(`❌ User not found with userId: ${userId}`);
-        }
       } catch (updateError) {
-        console.error('❌ Error updating user isVerified status:', updateError);
       }
     } else {
-      console.log('❌ CRITICAL: No userId found - cannot update isVerified');
     }
 
     if (sessionId) {
-      console.log('🔄 Attempting to delete session...');
       try {
         const deleted = await SessionService.deleteSession(sessionId);
-        console.log('✅ Session deletion result:', deleted);
       } catch (sessionError) {
-        console.error('❌ Error deleting session:', sessionError);
       }
     }
 
-    console.log('🔄 Clearing session cookie...');
     clearSessionCookie(res);
 
-    console.log('✅ Logout process completed successfully');
     return res.status(200).json({
       success: true,
       message: 'Logged out successfully',
     });
   } catch (error) {
-    console.error('❌ Enhanced logout error:', error);
-    console.error('❌ Full error stack:', error.stack);
     
     // Always clear cookie on error too
     clearSessionCookie(res);
@@ -715,7 +624,6 @@ const revokeAllSessions = async (req, res) => {
 
     clearSessionCookie(res);
 
-    console.log(`✅ Revoked ${revokedCount} sessions for user: ${userId}`);
 
     return res.status(200).json({
       success: true,
@@ -723,7 +631,6 @@ const revokeAllSessions = async (req, res) => {
       revokedSessions: revokedCount,
     });
   } catch (error) {
-    console.error('❌ Revoke all sessions error:', error);
     res.status(500).json({
       success: false,
       message: 'Error revoking sessions',
@@ -755,7 +662,6 @@ const getUserSessions = async (req, res) => {
       totalSessions: sessionData.length,
     });
   } catch (error) {
-    console.error('❌ Get user sessions error:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching sessions',
@@ -785,7 +691,6 @@ const getProfile = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Get profile error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -800,7 +705,6 @@ const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
-    console.log('🔍 Forgot password request for email:', email);
 
     // Validation
     if (!email) {
@@ -825,7 +729,6 @@ const forgotPassword = async (req, res) => {
     });
 
     if (!userExists) {
-      console.log('❌ Email not registered:', email.toLowerCase());
       return res.status(404).json({
         success: false,
         message: 'This email address is not registered. Please check your email or create a new account.',
@@ -843,7 +746,6 @@ const forgotPassword = async (req, res) => {
       const remainingMinutes = COOLDOWN_MINUTES - minutesElapsed;
 
       if (remainingMinutes > MIN_TIME_BEFORE_NEXT_RESET_MINUTES) {
-        console.log(`❌ Password reset blocked - ${remainingMinutes.toFixed(1)} minutes remaining`);
         
         const remainingTime = {
           minutes: Math.floor(remainingMinutes),
@@ -866,7 +768,6 @@ const forgotPassword = async (req, res) => {
       }
     }
 
-    console.log('✅ User found and verified for password reset:', userExists.email);
 
     // Delete any existing verification codes for this user
     await schemaForVerify.deleteMany({ userId: userExists._id });
@@ -881,7 +782,6 @@ const forgotPassword = async (req, res) => {
     });
     await newVerification.save();
 
-    console.log('✅ Reset code generated and saved:', resetCode);
 
     // Send forgot password email
     try {
@@ -891,7 +791,6 @@ const forgotPassword = async (req, res) => {
         userExists.profile?.firstName || 'User'
       );
 
-      console.log('✅ Forgot password email sent successfully');
 
       return res.status(200).json({
         success: true,
@@ -904,7 +803,6 @@ const forgotPassword = async (req, res) => {
         }
       });
     } catch (emailError) {
-      console.error('❌ Failed to send forgot password email:', emailError);
 
       // Delete the verification entry if email fails
       await schemaForVerify.deleteOne({ userId: userExists._id });
@@ -915,7 +813,6 @@ const forgotPassword = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('❌ Forgot password error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -929,7 +826,6 @@ const verifyResetCode = async (req, res) => {
   try {
     const { email, resetCode } = req.body;
 
-    console.log('🔍 Verifying reset code for:', email);
 
     // Validation
     if (!email || !resetCode) {
@@ -964,7 +860,6 @@ const verifyResetCode = async (req, res) => {
       });
     }
 
-    console.log('✅ Reset code verified successfully');
 
     return res.status(200).json({
       success: true,
@@ -972,7 +867,6 @@ const verifyResetCode = async (req, res) => {
       email: user.email,
     });
   } catch (error) {
-    console.error('❌ Verify reset code error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -986,7 +880,6 @@ const resetPassword = async (req, res) => {
   try {
     const { email, resetCode, newPassword, confirmPassword } = req.body;
 
-    console.log('🔍 Password reset attempt for:', email);
 
     // Validation
     if (!email || !resetCode || !newPassword || !confirmPassword) {
@@ -1037,7 +930,6 @@ const resetPassword = async (req, res) => {
       });
     }
 
-    console.log('✅ Reset code verified, updating password');
 
     // Hash new password
     const saltRounds = 12;
@@ -1051,7 +943,6 @@ const resetPassword = async (req, res) => {
     // Delete verification entry after successful password reset
     await schemaForVerify.deleteOne({ _id: verification._id });
 
-    console.log('✅ Password reset successfully');
 
     return res.status(200).json({
       success: true,
@@ -1063,7 +954,6 @@ const resetPassword = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Reset password error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -1100,15 +990,6 @@ const updateProfile = async (req, res) => {
 
     const profilePic = req.file;
 
-    console.log("🔍 Extracted fields:", {
-      firstName, lastName, dateOfBirth, gender, institute, residence, dateOfGraduation, specialty, countryOfResidence
-    });
-    console.log('🔍 Social Media URLs:', {
-      facebookUrl,
-      twitterUrl,
-      instagramUrl,
-    });
-    console.log('🔍 Profile Pic:', profilePic ? 'Present' : 'Not present');
 
     // ✅ Enhanced validation with detailed error messages
     if (!firstName) {
@@ -1143,15 +1024,8 @@ const updateProfile = async (req, res) => {
     if (dateOfBirth) {
       const dateOfBirthYear = new Date(dateOfBirth).getFullYear();
       const currentYear = new Date().getFullYear();
-      console.log(
-        '🔍 dateOfBirth Year:',
-        dateOfBirthYear,
-        'Current Year:',
-        currentYear
-      );
 
       if (dateOfBirthYear >= currentYear) {
-        console.log('❌ dateOfBirth validation failed - returning 400');
         return res.status(400).json({
           success: false,
           message: 'Date of Birth cannot be from current or future years',
@@ -1162,12 +1036,6 @@ const updateProfile = async (req, res) => {
     if (dateOfGraduation) {
       const dateOfGraduationYear = new Date(dateOfGraduation).getFullYear();
       const currentYear = new Date().getFullYear();
-      console.log(
-        '🔍 dateOfGraduation Year:',
-        dateOfGraduationYear,
-        'Current Year:',
-        currentYear
-      );
     }
 
     // Get current user to preserve existing profile data
@@ -1211,7 +1079,6 @@ const updateProfile = async (req, res) => {
         const cloudResponse = await cloudinary.uploader.upload(getUrl.content);
         updatedProfile.profilePic = cloudResponse?.secure_url || '';
       } catch (uploadError) {
-        console.error('❌ Profile picture upload failed:', uploadError);
         return res.status(400).json({
           success: false,
           message: 'Failed to upload profile picture',
@@ -1229,7 +1096,6 @@ const updateProfile = async (req, res) => {
       )
       .select('-password');
 
-    console.log('✅ Profile updated successfully');
 
     res.status(200).json({
       success: true,
@@ -1237,7 +1103,6 @@ const updateProfile = async (req, res) => {
       user: updatedUser,
     });
   } catch (error) {
-    console.error('Update profile error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',

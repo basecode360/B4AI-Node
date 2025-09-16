@@ -47,7 +47,6 @@ const universityModel = mongoose.models.University || mongoose.model("University
 // ✅ GET /api/universities - Get all universities with optional search and pagination
 router.get("/", async (req, res) => {
   try {
-    console.log("🏫 Fetching universities from MongoDB collection 'universities'...");
     
     const { 
       search, 
@@ -94,7 +93,6 @@ router.get("/", async (req, res) => {
     const totalCount = await universityModel.countDocuments(query);
     const totalPages = Math.ceil(totalCount / parseInt(limit));
 
-    console.log(`📊 Found ${universities.length} universities (Total: ${totalCount})`);
 
     res.status(200).json({
       success: true,
@@ -110,7 +108,6 @@ router.get("/", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Error fetching universities:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch universities",
@@ -124,7 +121,6 @@ router.get("/search", async (req, res) => {
   try {
     const { q, limit = 15 } = req.query;
     
-    console.log(`🔍 Searching universities with query: "${q}"`);
 
     if (!q || q.length < 2) {
       return res.status(400).json({
@@ -146,7 +142,6 @@ router.get("/search", async (req, res) => {
       .limit(parseInt(limit))
       .lean();
 
-    console.log(`✅ Search results: ${universities.length} universities found`);
 
     res.status(200).json({
       success: true,
@@ -155,7 +150,6 @@ router.get("/search", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Error searching universities:", error);
     res.status(500).json({
       success: false,
       message: "Failed to search universities",
@@ -167,13 +161,11 @@ router.get("/search", async (req, res) => {
 // ✅ GET /api/universities/countries - Get list of countries from your data
 router.get("/countries", async (req, res) => {
   try {
-    console.log("🌍 Fetching countries list from universities collection...");
     
     const countries = await universityModel
       .distinct('country')
       .sort();
 
-    console.log(`✅ Found ${countries.length} countries`);
 
     res.status(200).json({
       success: true,
@@ -182,7 +174,6 @@ router.get("/countries", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Error fetching countries:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch countries",
@@ -194,7 +185,6 @@ router.get("/countries", async (req, res) => {
 // ✅ GET /api/universities/stats - Get universities statistics
 router.get("/stats", async (req, res) => {
   try {
-    console.log("📊 Fetching universities statistics...");
     
     const totalUniversities = await universityModel.countDocuments();
     const totalCountries = await universityModel.distinct('country');
@@ -209,7 +199,6 @@ router.get("/stats", async (req, res) => {
       withoutMedicalPrograms: totalUniversities - withMedicalPrograms
     };
     
-    console.log("📊 Universities statistics:", stats);
     
     res.status(200).json({
       success: true,
@@ -218,7 +207,6 @@ router.get("/stats", async (req, res) => {
     });
     
   } catch (error) {
-    console.error("❌ Error fetching universities statistics:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch universities statistics",
@@ -230,7 +218,6 @@ router.get("/stats", async (req, res) => {
 // ✅ Test endpoint to check collection structure
 router.get("/test", async (req, res) => {
   try {
-    console.log("🧪 Testing universities collection...");
     
     // Get a sample of universities to see the structure
     const sampleUniversities = await universityModel
@@ -242,9 +229,6 @@ router.get("/test", async (req, res) => {
     const totalCount = await universityModel.countDocuments();
     const fieldsExample = sampleUniversities[0] || {};
     
-    console.log("🔍 Collection test results:");
-    console.log("Total universities:", totalCount);
-    console.log("Sample structure:", fieldsExample);
     
     res.status(200).json({
       success: true,
@@ -258,7 +242,6 @@ router.get("/test", async (req, res) => {
     });
     
   } catch (error) {
-    console.error("❌ Error testing universities collection:", error);
     res.status(500).json({
       success: false,
       message: "Failed to test universities collection",
